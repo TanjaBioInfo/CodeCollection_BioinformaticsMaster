@@ -1,0 +1,1815 @@
+---
+title: "Exan-Preparation"
+author: "TR"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+EXAM-PREPARATION
+
+Testexam 2024, part B
+
+Problem 1, birds
+
+a) perform EDA, check the statistics of the data, visualize the data and comment on the visualizations. 
+
+```{r}
+# Load the data from CSV into a data frame
+birds <- read.csv("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/birds.csv", header=TRUE, sep=",")
+
+# Inspect the first few rows to verify import and column names
+head(birds)
+
+# Check the structure: data types, number of observations, etc.
+str(birds)
+
+# Get summary statistics:
+summary(birds)
+#    - For `decibels`: min, 1st quartile, median, mean, 3rd quartile, max
+##       The mean measured decibels were 78.41, with a range spanning from 71.6 to 83.67.
+#    - For `Urban`: counts of TRUE vs. FALSE, 
+##       40 measurements in total, splitted into equal groups of each at a size of 20. 
+
+# Show the marginal distribution with histogramms for each of the variable (decibels separated into Urban==TRUE and Urban==FALSE)
+par(mfrow = c(1,2))
+hist(birds[birds$Urban == TRUE, ]$decibels, probability = TRUE, main = "Decibels with urban noise", xlab = "Decibel")
+hist(birds[birds$Urban == FALSE, ]$decibels, probability = TRUE, main = "Decibels without urban noise", xlab = "Decibel")
+##     The histograms reveal slight differences in the distributions, with the urban noise distribution being somewhat left-skewed.
+
+# table(birds$decibels)
+```
+The mean measured decibels were 78.41, with a range spanning from 71.6 to 83.67. There are a total of 40 measurements, evenly split with 20 for urban noise and 20 for non-urban noise. The histograms reveal slight differences in the distributions, with the urban noise distribution being somewhat left-skewed. 
+
+```{r}
+boxplot(decibels ~ Urban, data = birds, main = "Boxplot for birds song volume in decibels in urban areas versus rural areas", xlab = "Urban noise", ylab = "Decibels")
+# # or
+# boxplot(birds$decibels ~ birds$Urban, main = "Boxplot for birds song volume in decibels in urban areas versus rural areas", xlab = "Urban noise", ylab = "Decibels")
+# # or
+# library(ggplot2)
+# ggplot(birds, aes(x = Urban, y = decibels)) +
+#   geom_boxplot() +
+#   geom_jitter(width = 0.1)
+##     The boxplots indicate that birds in urban areas are generally louder than those in non-urban areas.
+
+# pairs(birds, lower.panel = NULL, pch = 19, cex = 0.7)
+```
+The boxplots indicate that birds in urban areas are generally louder than those in non-urban areas.
+
+```{r}
+# check normality assumptions of urban data
+par(mfrow = c(1,2))
+qqnorm(birds[birds$Urban == TRUE, ]$decibels)
+qqline(birds[birds$Urban == TRUE, ]$decibels)
+# check normality assumptions of rural data
+qqnorm(birds[birds$Urban == FALSE, ]$decibels)
+qqline(birds[birds$Urban == FALSE, ]$decibels)
+#     The qqplots show that the assumption of normality is fulfilled, no outliers based on boxplots. 
+
+# check equal variance assumption by a F-test
+var.test(birds[birds$Urban == FALSE, ]$decibels, birds[birds$Urban ==
+TRUE, ]$decibels)
+#     Also the variances seem to be roughly equal as the high pvalue suggests. The assumptions for the t-test are fulfilled (assuming that the measurements are also independent).
+```
+The qqplots show that the assumption of normality is fulfilled, no outliers based on boxplots. Also the variances seem to be roughly equal as the high pvalue suggests. The assumptions for the t-test are fulfilled (assuming that the measurements are also independent).
+
+b) T-test
+```{r}
+t.test(decibels ~ Urban, data = birds, var=TRUE)
+#     With a p-value of 0.058 which is greater than the significance level of 0.05, we fail to reject the null hypothesis suggesting that there is no statistically significant difference in bird song volume between urban and rural settings. 
+```
+With a p-value of 0.058 which is greater than the significance level of 0.05, we fail to reject the null hypothesis suggesting that there is no statistically significant difference in bird song volume between urban and rural settings. 
+
+c) Permutation test function
+```{r}
+# solution from the exercises:
+perm_test <- function(x, y) {
+R <- 1000
+# Store the 'original' observed median difference
+tobs <- median(x) - median(y)
+# Store the data without the group labels (try using c() )
+all.data <- c(x, y)
+tsim <- array(0, R) # Preallocation of R-amount of values, yet: all values==0
+for (i in 1:R) {
+index <- sample(1:length(all.data), length(all.data), replace = FALSE) # random permutation
+medianxA <- median(all.data[index[1:length(x)]]) # Sample median of group A
+medianxB <- median(all.data[index[(length(x) + 1):length(all.data)]]) # Sample median of group B 
+tsim[i] <- medianxA - medianxB # Difference for the current iteration
+}
+# Sample p-value. Proportion of 'some' values and amount of iterations
+return(sum(abs(tsim) >= abs(tobs))/R)
+}
+# We test our function:
+yA <- birds[birds$Urban == TRUE, 1] # Split the data such that you have one factor per group
+yB <- birds[birds$Urban == FALSE, 1] # Split the data such that you have one factor per group
+set.seed(14) # (Depending on the seed, you could also have a p-value above 0:05)
+permtest <- perm_test(yA, yB)
+print(permtest)
+#     When using a permutation test we obtain a pvalue < 0:05. This suggests that the loudness is different between a rural and urban setting. Therefore the groups are not exchangable in terms of loudness. 
+```
+When using a permutation test we obtain a pvalue < 0:05. This suggests that the loudness is different between a rural and urban setting. Therefore the groups are not exchangable in terms of loudness. 
+
+Problem 2, X ~ Bin(50, 0.4)
+
+a) 1000 observations from X, Histogram of samples values with theoretical pmf
+```{r}
+set.seed(158)
+# Sample 1000 observations from X ~ Bin(50, 0.4)
+x_samples <- rbinom(1000, size = 50, prob = 0.4)
+# Plot the histogram of sampled values
+hist(x_samples, prob = TRUE, main = "Histogram of 1000 samples from Bin(50, 0.4)",
+xlab = "Number of successes", col = "lightblue")
+# Add the theoretical probability mass function
+x_values <- 0:50
+pmf_values <- dbinom(x_values, size = 50, prob = 0.4)
+# points(x_values, pmf_values, col = "red", type = "h", lwd = 2)
+points(x_values, pmf_values, col = "red", type = "h", lwd = 2)
+#     The histogram of 1 000 draws from Bin(50, 0.4) is roughly bell-shaped around 20 successes, matching the theoretical mean. The red barplots of the exact PMF aligns closely with the bar heights of the histogram, illustrating that the simulation faithfully reproduces the true binomial probabilities.
+```
+The histogram of 1 000 draws from Bin(50, 0.4) is roughly bell-shaped around 20 successes, matching the theoretical mean. The red curve of the exact PMF aligns closely with the bar heights, illustrating that the simulation faithfully reproduces the true binomial probabilities.
+
+b) Sample 1 observation from X, estimate parameter p and compute Wald-CI
+```{r}
+# It is confusing, that we work with one observation. But at the same time, it means we have 50 observations from a Bernoulli distribution.
+# Sample one observation from X ~ Bin(50, 0.4)
+one_sample <- rbinom(1, size = 50, prob = 0.4) # E(X1)
+# Estimate parameter p based on the observation (p=(E(X1)/n))
+p_hat <- one_sample/50
+# Compute Wald confidence interval for p_hat
+n <- 50
+se <- sqrt(p_hat * (1 - p_hat)/n)
+z_value <- qnorm(0.975) # 95% confidence
+wald_ci <- p_hat + c(-1, 1) * z_value * se
+
+wald_ci
+```
+
+c) Ratio (%) of samples from X for H0: p = 0.4 at p-value of 5%
+```{r}
+obs <- 1000
+# Sample 1000 observations from X (X1, ..., X1000)
+x_samples <- rbinom(obs, size = 50, prob = 0.4)
+# Initialize vector to store p-values
+p_values <- numeric(obs)
+# Loop through each sample and perform hypothesis test, using prop.test()
+for (i in 1:obs) {
+test_result <- prop.test(x_samples[i], 50, p = 0.4, correct = FALSE)
+p_values[i] <- test_result$p.value
+}
+#     I choosed a prop.test() as an approximate (chi-square) test of a single proportion. I would use a binom.test() for an exact test. But, it’s convenient here with the prop.test() because it directly assesses whether each observed success count in a sample of size 50 deviates from the null proportion (p=0.4) without assuming normality of underlying measurement data.
+
+# Compute the percantage of significant p-values
+significant_p_values <- mean(p_values < 0.05)
+significant_p_values
+#     The simulation drew 1000 independent Binomial(50, 0.4) samples and ran prop.test(..., correct=FALSE) on each. About 4.6 % of those tests yielded p<0.05, which matches the nominal Type I error rate (α = 0.05) if H0 is true.
+```
+I choosed a prop.test() as an approximate (chi-square) test of a single proportion. I would use a binom.test() for an exact test. But, it’s convenient here with the prop.test() because it directly assesses whether each observed success count in a sample of size 50 deviates from the null proportion (p=0.4) without assuming normality of underlying measurement data.
+
+The simulation drew 1000 independent Binomial(50, 0.4) samples and ran prop.test(..., correct=FALSE) on each. About 4.6 % of those tests yielded p<0.05, which matches the nominal Type I error rate (α = 0.05) if H0 is true.
+
+d) Proportiontest of to different samples
+```{r}
+# Sample one observation from X and Y
+one_sample_X <- rbinom(1, size = 50, prob = 0.4) # E(X1)
+one_sample_Y <- rbinom(1, size = 40, prob = 0.3) # E(Y1)
+# Perform hypothesis test (prop.test()) to compare proportions
+test_result <- prop.test(c(one_sample_X, one_sample_Y), c(50, 40)) # prop-test verlangt die Daten in vectors
+test_result
+#       As the p-value is relatively large (p-value = 0.5508) and 0 falls within the confidence interval, we cannot reject the null hypothesis at the 0.05 significance level.
+```
+As the p-value is relatively large (p-value = 0.5508) and 0 falls within the confidence interval, we cannot reject the null hypothesis at the 0.05 significance level.
+
+
+Final exam 2017, part B
+
+Problem 1, pima
+
+a) H1: Women with diabetes have on average a higher BMI
+```{r}
+# 1. Lade das Pima-Datenset
+pima <- read.table("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/pima.txt", header = TRUE, sep = ",")
+
+# 2. Erste Zeilen prüfen
+head(pima)
+
+# 3. Datenstruktur ansehen: Variablen, Typen, Anzahl Beobachtungen
+str(pima)
+
+# 4. Zusammenfassung der wichtigsten Kennzahlen
+summary(pima)
+#   - Für `bmi`: Min, 1. Quartil, Median, Mittelwert, 3. Quartil, Max
+#     → z.B. mean(bmi) ≈ 32.0, Range vielleicht von ~18 bis ~67.
+#   - Für `test` (0 = negativ, 1 = positiv):
+#     → z.B. 422 negative vs. 268 positive Fälle (insgesamt 690 Beobachtungen).
+
+# 5. Zwei Histogramme nebeneinander: BMI bei positivem vs. negativem Test
+par(mfrow = c(1, 2))
+hist(pima$bmi[pima$test == 1], main = "BMI bei positivem Diabetes-Test", xlab = "Body Mass Index (BMI)", ylab = "Häufigkeit", col = "salmon", breaks = 20)
+hist(pima$bmi[pima$test == 0], main = "BMI bei negativem Diabetes-Test", xlab = "Body Mass Index (BMI)", ylab = "Häufigkeit", col = "lightblue", breaks = 20)
+# → Die beiden Verteilungen zeigen, dass Patienten mit positivem Test tendenziell höhere BMI-Werte haben.
+
+# 6. Optional: Häufigkeitstabelle für die Testvariable
+table(pima$test)
+# → Gibt z.B. 0: 422  und  1: 268 aus, was die Aufteilung in negativ vs. positiv zeigt.
+```
+```{r}
+boxplot(bmi ~ test, data  = pima, names = c("No diabetes", "With diabetes"),
+ col = c("lightblue", "salmon"), main  = "BMI by Diabetes Status", xlab  = "Diabetes Test Result", ylab  = "Body Mass Index (BMI)")
+# Die beiden Boxplots zeigen, dass Patienten mit positivem Test tendenziell höhere BMI-Werte haben.
+```
+
+```{r}
+par(mfcol = c(1, 2))
+bmipositive <- pima$bmi[pima$bmi > 0 & pima$test == 1]
+bminegative <- pima$bmi[pima$bmi > 0 & pima$test == 0]
+# Neue Variablen, ohne Nullen Q-Q plots mit Linien, wieder mit Farbcodierung:
+qqnorm(bmipositive, col = 2, main = "diabetes positives in red, negatives in blue", ylim = c(10, 70))
+qqline(bmipositive, col = 2)
+tmp <- qqnorm(bminegative, plot.it = F)
+points(tmp, col = 4)
+qqline(bminegative, col = 4)
+```
+
+```{r}
+# check equal variance assumption by a F-test
+var.test(pima[pima$test == 0, ]$bmi, pima[pima$test ==
+1, ]$bmi)
+#     Also the variances seem to be roughly equal as the high pvalue suggests. The assumptions for the t-test are fulfilled (assuming that the measurements are also independent).
+```
+
+```{r}
+pima$bmi[pima$bmi == 0] <- NA # Nullen werden durch NA’s ersetzt
+# Ungepaarter t-Test:
+t.test(bmi ~ test, data = pima, var.eq = T)
+#     The true difference in means of BMI between positive diabetes tested and negative diabetes tested differs significantly. 
+```
+The true difference in means of BMI between positive diabetes tested and negative diabetes tested differs significantly.
+
+b) H1: There's a strong positive relationship between distolic blood pressure and BMI
+```{r}
+plot(pima$diastolic, pima$bmi)
+subset <- (pima$diastolic > 0) & (pima$bmi > 0)
+cor.test(pima$diastolic[subset], pima$bmi[subset])
+#     There's a strong positive relationship between distolic blood pressure and BMI with a correlation coefficient of 0.29. 
+```
+There's a strong positive relationship between distolic blood pressure and BMI with a correlation coefficient of 0.29. 
+
+c) H1: The BMI changes differently over age if diabetes has been diagnosed
+```{r}
+out <- lm(bmi ~ age * test, data = pima, subset = pima$bmi > 0)
+summary(out)
+#     (Intercept) = 30.53: Estimated mean BMI at age 0 for the reference group (test = 0, i.e. non-diabetics).
+# #     Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+# (Intercept) 30.52866    0.84979  35.925  < 2e-16 ***
+# age          0.01059    0.02550   0.415  0.67794    
+# test         9.13019    1.65274   5.524 4.56e-08 ***
+# age:test    -0.12542    0.04470  -2.806  0.00515 **
+# sloppy version:
+summary(lm(bmi ~ age, data = pima, subset = (pima$bmi > 0) & (pima$test == 0)))
+#     p-value: 0.679
+summary(lm(bmi ~ age, data = pima, subset = (pima$bmi > 0) & (pima$test == 1)))
+#     p-value: 0.001843, slope age -0.1148
+#     These match exactly the interaction output.
+
+par(mfrow=c(1,2))
+plot(bmi ~ age, data = pima, col = pima$test + 1)
+abline(c(out$coef[c("(Intercept)", "age")]))
+abline(c(out$coef[c("(Intercept)", "age")] + out$coef[c("test", "age:test")]), col = 2)
+#     Diabetics start with higher BMI at younger ages but their BMI decreases significantly with age, whereas non-diabetics show no significant age-BMI trend.
+```
+Diabetics start with higher BMI at younger ages but their BMI decreases significantly with age, whereas non-diabetics show no significant age-BMI trend.
+
+Problem 2
+
+a) linear statistical model with beta0 = -1, beta1 = 3, var = 2 - compare var(beta_hat) to var = 2 (theoretical var), make N(250) simulations and save all estimated betas in a var-matrix
+```{r}
+set.seed(1976)
+N <- 250 # number of simulations
+nforx <- 133 # number of x's
+x <- (1:nforx)/(nforx + 1)
+betas <- matrix(0, N, 2) # N rows, 2 columns
+for (i in 1:N) {
+y <- -1 + 3 * x + rnorm(nforx, 0, sqrt(2))
+betas[i, ] <- coef(lm(y ~ x))
+}
+var(betas)
+#             beta0 [,1]  beta1 [,2]
+# beta0 [1,]  0.06172458 -0.0946822
+# beta1 [2,] -0.09468220  0.1866901
+#     The sample covariance of our simulation quantifies how much the intercept and slope vary across simulations. 
+```
+The sample covariance of our simulation quantifies how much the intercept and slope vary across simulations. 
+
+b) compare the empirical variance of the estimated/simulated betas to the theoretical value
+```{r}
+# calculate the theoretical var-matrix
+X <- cbind(1, x) # per def. intercept is == 1
+print(Sigma <- 2 * solve(t(X) %*% X)) # 2 is the theoretical variation, diagonal in matrix
+#                         x
+#    0.06083390 -0.09159262
+# x -0.09159262  0.18318524
+#     These values match your simulated variances and covariances very closely, confirming that the Monte Carlo replicates reproduce the known sampling variability. 
+```
+These values match your simulated variances and covariances very closely, confirming that the Monte Carlo replicates reproduce the known sampling variability.
+
+c) compare of simulated (estimated/empiric) regressioncoefficients-points in a plot with theoretic isolines
+```{r}
+require(ellipse)
+plot(betas, pch = 20) # scatter plot of simulated betas
+Sigmahat <- cov(betas) # empiric covariance
+muhat <- apply(betas, 2, mean) # center of the scatters in the plot
+lines(ellipse(Sigmahat, centre = muhat, level = 0.95), col = 2, lwd = 2) # 95% confidence ellipse from simulation (empiric)
+lines(ellipse(Sigmahat, centre = muhat, level = 0.5), col = 4, lwd = 2) # 50% confidence ellipse from simulation (empiric)
+lines(ellipse(Sigma, centre = c(-1, 3), level = 0.95), col = 2, lty = 2) # 95% confidence ellipse from theory (center is true value)
+lines(ellipse(Sigma, centre = c(-1, 3), level = 0.5), col = 4, lty = 2) # 50% confidence ellipse from theory
+#     Plotting the 250 points (β0 , β1) shows a cloud centered near (−1,3). Overlaying the 50% and 95% empirical ellipses (solid) and the corresponding theoretical ellipses (dashed) demonstrates near‐perfect alignment: the simulated estimates fall inside the theoretical confidence regions at the expected rates, visually validating both your code and the Gaussian linear model theory.
+```
+Plotting the 250 points (β0 , β1) shows a cloud centered near (−1,3). Overlaying the 50% and 95% empirical ellipses (solid) and the corresponding theoretical ellipses (dashed) demonstrates near‐perfect alignment: the simulated estimates fall inside the theoretical confidence regions at the expected rates, visually validating both your code and the Gaussian linear model theory.
+
+
+Test exam 2018, part B
+
+Problem 3, sleep
+
+perform EDA, check the statistics of the data, visualize the data and comment on the visualizations. H0: both drugs (A/B) are on average equally effective. two sample t-test. 
+```{r}
+# Daten einlesen
+sleep <- read.csv("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/sleep_mammals.csv", header=TRUE, sep=",") # cave, habe die sleep Datei nicht, gibt hier keine Variable "extra"
+
+# Erste Übersicht
+head(sleep)
+str(sleep)
+summary(sleep)
+
+# EDA: Histogramme & Boxplots
+par(mfrow = c(1,2))
+hist(sleep[sleep$group == 1, ]$extra, main = "Group 1", xlab = "Extra Sleep")
+hist(sleep[sleep$group == 2, ]$extra, main = "Group 2", xlab = "Extra Sleep")
+
+boxplot(extra ~ group, data = sleep, main = "Boxplot of Extra by Group", names = c("Group 1", "Group 2"), ylab = "Extra Sleep")
+
+# Normalitätsprüfung (Q-Q-Plots)
+par(mfrow = c(1,2))
+qqnorm(sleep[sleep$group == 1, ]$extra); qqline(sleep[sleep$group == 1, ]$extra)
+qqnorm(sleep[sleep$group == 2, ]$extra); qqline(sleep[sleep$group == 2, ]$extra)
+
+# Varianzgleichheit prüfen (F-Test)
+var.test(extra ~ group, data = sleep)
+
+# Zwei-Stichproben-t-Test (ungepaart)
+t.test(extra ~ group, data = sleep, paired = FALSE, var.equal = TRUE)
+```
+The mean measured extra were ..., with a range spanning from ... to .... There are a total of 20 measurements, evenly split with 10 for group 1 and 10 for group 2. The histograms reveal slight differences in the distributions, with the group 1 distribution being somewhat ...-skewed. 
+The qqplots show that the assumption of normality is fulfilled, no outliers based on boxplots. Also the variances seem to be roughly equal as the high p-value suggests. The assumptions for the t-test are fulfilled (assuming that the measurements are also independent).
+Based on the p-value of 0.002833 which is smaller than the significance level of 0.05, we reject the null hypothesis at 5% significance level, that two drugs have the same increased hours of sleep, therefore the drugs are not equally effective.
+
+Alternatively, one can also conduct one-sample t.test assuming each group has different patient (need to be stated) or rank test if normality is not assumed. If the p-value is greater than 0.05, then we failed to reject the null hypothesis at 95% confidence level, there is not enough evidence to suggest the drugs are not equally effective OR
+there is not enough evidence to suggest the drugs are differently effective. 
+
+one-sample t.test
+```{r}
+# Group 1 (drug 1)
+g1 <- sleep$extra[sleep$group == 1]
+t1 <- t.test(g1, mu = 0)
+print(t1)
+
+# Group 2 (drug 2)
+g2 <- sleep$extra[sleep$group == 2]
+t2 <- t.test(g2, mu = 0)
+print(t2)
+```
+
+Permutation test function
+```{r}
+# solution from the exercises:
+perm_test <- function(x, y) {
+R <- 1000
+# Store the 'original' observed median difference
+tobs <- median(x) - median(y)
+# Store the data without the group labels (try using c() )
+all.data <- c(x, y)
+tsim <- array(0, R) # Preallocation of R-amount of values, yet: all values==0
+for (i in 1:R) {
+index <- sample(1:length(all.data), length(all.data), replace = FALSE) # random permutation
+medianxA <- median(all.data[index[1:length(x)]]) # Sample median of group A
+medianxB <- median(all.data[index[(length(x) + 1):length(all.data)]]) # Sample median of group B 
+tsim[i] <- medianxA - medianxB # Difference for the current iteration
+}
+# Sample p-value. Proportion of 'some' values and amount of iterations
+return(sum(abs(tsim) >= abs(tobs))/R)
+}
+# We test our function:
+yA <- sleep[sleep$group == 1, 1] # Split the data such that you have one factor per group
+yB <- sleep[sleep$group == 2, 1] # Split the data such that you have one factor per group
+set.seed(14) # (Depending on the seed, you could also have a p-value above 0:05)
+permtest <- perm_test(yA, yB)
+print(permtest)
+#     When using a permutation test we obtain a p-value < 0:05. This suggests that the extra sleep is different between the two groups. Therefore the groups are not exchangable in terms of extra sleep. 
+```
+When using a permutation test we obtain a p-value < 0:05. This suggests that the extra sleep is different between the two groups. Therefore the groups are not exchangable in terms of extra sleep.
+
+Problem 4, t-distribution with ? df adapts to normal-distribution
+
+a) Plot a density of a standard normal random variable. Superimpose the density of a t-distribution with one degree of freedom in blue color.
+```{r}
+# 1. Create a fine grid of x–values
+x <- seq(-6, 6, length.out = 1000)
+
+# 2. Compute the standard Normal density
+# z <- dnorm(x, mean = 0, sd = 1)
+
+# 3. Plot the Normal density
+plot(x, dnorm(x, mean = 0, sd = 1), type ="l", lwd = 2, col= "black", ylim = c(0, max(dnorm(x, mean = 0, sd = 1), dt(x, df = 1))), ylab = "Density", xlab = "x", main = "Standard Normal vs. t(1) Density")
+
+# 4. Superimpose the t–distribution density with df = 1
+lines(x, dt(x, df = 1), col = "blue", lwd = 2, lty= 2)
+
+# 5. Add a legend
+legend("topright", legend = c("N(0,1)", "t(1)"), col = c("black", "blue"), lwd = 2, lty = c(1, 2))
+```
+
+b) Choose the degrees of freedom of a t-distribution such that the difference between
+its density and the one of a standard normal distribution is smaller than 0.001 in every location. 
+```{r}
+x <- seq(-6, 6, length.out = 1000)
+threshold <- 0.001
+
+for (df in 1:1000) {
+  # compute pointwise densities
+  norm_vals <- dnorm(x, mean = 0, sd = 1)
+  t_vals    <- dt(x, df = df)
+  
+  # sup‐norm distance
+  max_diff  <- max(abs(norm_vals - t_vals))
+  
+  if (max_diff < threshold) {
+    cat("Minimum df =", df, "with max difference =", max_diff, "\n")
+    break
+  }
+}
+```
+
+same, but with for loop:
+```{r}
+# Define the grid of degrees of freedom and the threshold
+df_vec    <- 1:1000
+threshold <- 0.001
+
+# Preallocate a vector to store the maximum density differences
+max_diffs <- numeric(length(df_vec))
+
+# Grid of x-values on which to compare the densities
+x <- seq(-6, 6, length.out = 1000)
+
+# Loop over all candidate df’s
+for (i in seq_along(df_vec)) {
+  df <- df_vec[i]
+  # Compute densities
+  norm_vals <- dnorm(x)
+  t_vals    <- dt(x, df = df)
+  # Compute sup‐norm distance and store it
+  max_diffs[i] <- max(abs(norm_vals - t_vals))
+}
+
+# Find the smallest df for which the difference is below the threshold
+result_df <- df_vec[which(max_diffs < threshold)[1]]
+
+# Output
+cat("Minimum df =", result_df, 
+    "with max difference =", round(max_diffs[which(max_diffs < threshold)[1]], 6), "\n")
+```
+
+
+Final Exam 2020
+
+Problem 5
+
+a) perform EDA, happy in faraway
+```{r}
+library(faraway)
+data <- happy
+#?happy # what are the data types?
+head(data, n = 2) # first impression
+str(data) # R-data types
+apply(data[,c("happy","sex","love","work")], MARGIN = 2, FUN = table)
+summary(data$money)
+plot(table(data$happy))
+pairs(data, lower.panel=NULL, pch = 19, cex = 0.7)
+Fdata <- data # could also overwrite
+str(Fdata) # check result
+Fdata$sex <- factor(Fdata$sex)
+Fdata$love <- factor(Fdata$love)
+Fdata$work <- factor(Fdata$work)
+fit <- lm(happy ~ money + sex + love + work, data = Fdata)
+X <- model.matrix(happy ~ money + sex + love + work, data = Fdata)
+dim(X)
+head(X, n = 3)
+plot(fit, which = 3)
+par(mfrow =c(1,2))
+plot(fit, which = c(1,2))
+vif(fit)
+summary(fit)
+n <- 39
+Fdata_noHappy <- subset(Fdata, select = -happy) # remove happy
+Fdata_noHappy[nrow(Fdata_noHappy) + 1,] <- c(money = 200, sex = 0, love = 2, work = 5)
+predict(fit, newdata = Fdata_noHappy[n+1,])
+fit.aic <- step(fit)
+#attributes(summary(fit.aic))
+beta_0 <- summary(fit.aic)$coefficients[1,1]
+SE_beta_0 <- summary(fit.aic)$coefficients[1,2]
+(CI_beta_0 <- c(beta_0-qt(0.975, df = 31)*SE_beta_0,
+beta_0+qt(0.975, df = 31)*SE_beta_0))
+# Or:
+head(confint(fit.aic, level = 0.95), n=1)
+```
+
+
+Final Exam 2015
+
+Problem 6
+
+a) EDA of EMG-activity on Day 1, 2, 3, paired t-test
+```{r}
+install.packages("PairedData")
+data(GDO, package = "PairedData")
+dim(GDO)
+
+head(GDO)
+
+par(mfcol=c(1,2))
+with(GDO, {
+boxplot(Day1, Day3, col = c("yellow", "orange"), xlab = "", ylab = "EMG measurements")
+axis(1, at = 1:2, labels = c("Day1", "Day3"))
+points(c(mean(Day1), mean(Day3)), pch = 19, col = "red")
+qqnorm(Day1 - Day3, main = "Normal Q-Q plot of Day1 - Day3", pch = 19, col = "red")
+qqline(Day1 - Day3, lwd = 2, col = "orange")
+})
+with(GDO, t.test( Day1, Day3, paired = TRUE, alternative = "two.sided"))
+```
+Delta-mean confidence interval (based on t-distribution with unknown variance), GDO data
+```{r}
+D <- GDO$Day1 - GDO$Day3
+n <- length(D)
+mean_D <- mean(D)
+se_D <- sd(D) / sqrt(n)
+t_crit <- qt(0.975, df = n - 1)
+
+ci_lower <- mean_D - t_crit * se_D
+ci_upper <- mean_D + t_crit * se_D
+
+c(ci_lower, ci_upper)
+```
+
+
+Problem 7
+
+a) EDA, wastewater with OC chemosphere
+```{r}
+mydata <- read.csv("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/11chemosphere_OC.csv", header = TRUE, sep = ",")
+mydata$logOC <- log(mydata$OC)
+str(mydata)
+mydata$Behandlung <- factor(mydata$Behandlung)
+mydata$Monat <- factor(mydata$Monat)
+table(mydata[, c("Monat", "Behandlung")])
+
+layout(matrix(c(1,2,3,3), 2, 2, byrow = TRUE))
+boxplot(logOC ~ Behandlung, data = mydata)
+boxplot(logOC ~ Monat, data = mydata)
+with(mydata, interaction.plot(Behandlung, Monat, logOC, type = "b", col = c("red","blue"),
+pch = c(16, 18), main = "Interaction between the two factors"))
+fit1lm <- lm(logOC ~ Behandlung, data = mydata)
+summary(fit1lm)
+library(car)
+qqPlot(fit1lm, simulate = TRUE)
+fit2lm <- lm(logOC ~ Behandlung + Monat, data = mydata)
+summary(fit2lm)
+fit3lm <- lm(logOC ~ Behandlung * Monat, data = mydata)
+anova( fit3lm)
+fit4lm <- lm(logOC ~ Behandlung * Monat + Produktion, data = mydata)
+anova( fit4lm)
+library(multcomp)
+tuk <- glht(fit1lm, linfct = mcp( Behandlung = "Tukey"))
+summary(tuk)
+```
+
+
+Test exam 2013, part B
+
+Problem 7, EDA with wine
+```{r}
+wine <- read.table("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/wine.txt", sep = ",", header = TRUE) # habe diese Datei nicht
+head(wine)
+str(wine)
+wine <- wine[wine$Price != "*", ]
+wine <- data.frame(lapply(wine, function(x) as.numeric(as.character(x))))
+str(wine)
+pairs(wine)
+wine$Price.log <- log(wine$Price)
+par(mfrow = c(1,4))
+with(wine, {plot(Temp, Price.log); plot(Rain, Price.log)
++ plot(PRain, Price.log); plot(Age, Price.log)})
+mod <- lm(Price.log ~ Age + Temp + Rain + PRain + Year, data = wine)
+summary(mod)
+par(mfrow = c(1,2)); plot(mod, which = 1:2)
+newdata <- data.frame(Temp=17.7, Rain=183.0, PRain=570.0, Age=-8.0)
+exp(predict(mod, newdata = newdata, interval = "prediction"))
+```
+
+
+Test exam 2018, part B
+
+Problem 1, EDA of diabetes-study, two sample t-test
+
+a) H1: Women with diabetes have on average a higher BMI
+```{r}
+# 1. Lade das Diabetes-Datenset
+DiabStudy <- read.table("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/DiabetesStudy.txt", header=TRUE, sep=",")  # habe diese Datei nicht
+
+# 2. Erste Zeilen prüfen
+head(DiabStudy)
+
+# 3. Datenstruktur ansehen: Variablen, Typen, Anzahl Beobachtungen
+str(DiabStudy)
+
+# 4. Zusammenfassung der wichtigsten Kennzahlen
+summary(DiabStudy)
+
+# 5. Zwei Histogramme nebeneinander: BMI bei positivem vs. negativem Test
+par(mfcol=c(1,2))
+hist( DiabStudy$bmi)
+plot( DiabStudy$bmi, col=4-2*DiabStudy$test, pch=c("-","+")[DiabStudy$test+1])
+
+# par(mfrow = c(1, 2))
+# hist(DiabStudy$bmi[DiabStudy$test == 1], main = "BMI bei positivem Diabetes-Test", xlab = "Body Mass Index (BMI)", ylab = "Häufigkeit", col = "salmon", breaks = 20)
+# hist(DiabStudy$bmi[DiabStudy$test == 0], main = "BMI bei negativem Diabetes-Test", xlab = "Body Mass Index (BMI)", ylab = "Häufigkeit", col = "lightblue", breaks = 20)
+# # → Die beiden Verteilungen zeigen, dass Patienten mit positivem Test tendenziell höhere BMI-Werte haben.
+
+# 6. Optional: Häufigkeitstabelle für die Testvariable
+table(DiabStudy$test)
+# → Gibt z.B. 0: 422  und  1: 268 aus, was die Aufteilung in negativ vs. positiv zeigt.
+```
+```{r}
+DiabStudy$test <- factor(DiabStudy$test, levels=0:1, labels=c("negative","positive"))
+summary(DiabStudy$test)
+
+par(mfcol=c(1,2))
+boxplot(bmi ~ test, data=DiabStudy,col=c(4,2))
+bmipositive <- DiabStudy$bmi[DiabStudy$bmi>0 & DiabStudy$test=="positive"]
+bminegative <- DiabStudy$bmi[DiabStudy$bmi>0 & DiabStudy$test=="negative"]
+qqnorm( bmipositive, col=2, main=’’, ylim=c(10,70), pch = "+")
+qqline( bmipositive, col=2)
+tmp <- qqnorm( bminegative, plot.it=F)
+points( tmp, col=4, pch = "-")
+qqline( bminegative, col=4)
+
+# boxplot(bmi ~ test, data  = DiabStudy, names = c("No diabetes", "With diabetes"),
+#  col = c("lightblue", "salmon"), main  = "BMI by Diabetes Status", xlab  = "Diabetes Test Result", ylab  = "Body Mass Index (BMI)")
+# # Die beiden Boxplots zeigen, dass Patienten mit positivem Test tendenziell höhere BMI-Werte haben.
+```
+
+```{r}
+# check equal variance assumption by a F-test
+var.test(DiabStudy[DiabStudy$test == 0, ]$bmi, DiabStudy[DiabStudy$test ==
+1, ]$bmi)
+#     Also the variances seem to be roughly equal as the high pvalue suggests. The assumptions for the t-test are fulfilled (assuming that the measurements are also independent).
+```
+
+```{r}
+DiabStudy$bmi[ DiabStudy$bmi == 0] <- NA
+## Error in DiabStudy$bmi[DiabStudy$bmi == 0] <- NA: Objekt ’DiabStudy’ nicht gefunden
+# two sample t-test
+t.test( bmi ~ test, data=DiabStudy, var.eq=T, paired=FALSE)
+#     The true difference in means of BMI between positive diabetes tested and negative diabetes tested differs significantly. 
+```
+The true difference in means of BMI between positive diabetes tested and negative diabetes tested differs significantly.
+
+b) H1: There's a strong positive relationship between distolic blood pressure and BMI
+```{r}
+plot(DiabStudy$diastolic, DiabStudy$bmi)
+subset <- (DiabStudy$diastolic > 0) & (DiabStudy$bmi > 0)
+cor.test(DiabStudy$diastolic[subset], DiabStudy$bmi[subset])
+#     There's a strong positive relationship between distolic blood pressure and BMI with a correlation coefficient of 0.29. 
+```
+There's a strong positive relationship between distolic blood pressure and BMI with a correlation coefficient of 0.29. 
+
+c) H1: The BMI changes differently over age if diabetes has been diagnosed
+```{r}
+out <- lm(bmi ~ age * test, data = DiabStudy, subset = DiabStudy$bmi > 0)
+summary(out)
+#     (Intercept) = 30.53: Estimated mean BMI at age 0 for the reference group (test = 0, i.e. non-diabetics).
+# #     Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+# (Intercept) 30.52866    0.84979  35.925  < 2e-16 ***
+# age          0.01059    0.02550   0.415  0.67794    
+# test         9.13019    1.65274   5.524 4.56e-08 ***
+# age:test    -0.12542    0.04470  -2.806  0.00515 **
+
+# sloppy version:
+summary(lm(bmi ~ age, data = DiabStudy, subset = (DiabStudy$bmi > 0) & (DiabStudy$test == 0)))
+#     p-value: 0.679
+summary(lm(bmi ~ age, data = DiabStudy, subset = (DiabStudy$bmi > 0) & (DiabStudy$test == 1)))
+#     p-value: 0.001843, slope age -0.1148
+#     These match exactly the interaction output.
+
+par(mfrow=c(1,2))
+plot(bmi ~ age, data = DiabStudy, col = DiabStudy$test + 1)
+abline(c(out$coef[c("(Intercept)", "age")]))
+abline(c(out$coef[c("(Intercept)", "age")] + out$coef[c("test", "age:test")]), col = 2)
+#     Diabetics start with higher BMI at younger ages but their BMI decreases significantly with age, whereas non-diabetics show no significant age-BMI trend.
+```
+Diabetics start with higher BMI at younger ages but their BMI decreases significantly with age, whereas non-diabetics show no significant age-BMI trend.
+
+
+Test exam 2020, part B
+
+Problem 6, EDA teengamb from faraway
+a) perform EDA
+```{r}
+# Load necessary packages
+library(faraway)    # for teengamb data
+library(ggplot2)    # for plotting
+library(car)        # for diagnostic plots and influence measures
+library(MASS)       # for stepAIC
+
+# (a) Load the data and perform EDA
+# # Load from web if not available in faraway
+# if (!exists("teengamb")) {
+#   teengamb <- read.csv("http://www.math.uzh.ch/furrer/download/exam/teengamb.csv")
+# } else {
+  data(teengamb, package = "faraway")
+# }
+# Inspect
+head(teengamb)    #Antwort: first rows
+str(teengamb)     #Antwort: structure shows sex, status, income, verbal, gamble
+summary(teengamb) #Antwort: summary stats for each variable
+
+# Univariate plots
+par(mfrow=c(2,3))
+hist(teengamb$gamble, main="Gambling Expenditure", xlab="pounds/year", col="lightblue") #Antwort: distribution
+hist(teengamb$income, main="Income", xlab="pounds/week", col="lightgreen") #Antwort: distribution
+hist(teengamb$status, main="Status", xlab="SES score", col="lightpink")
+hist(teengamb$verbal, main="Verbal Score", xlab="score (0-12)", col="lightgray")
+boxplot(gamble~sex, data=teengamb, names=c("Male","Female"), main="Gamble by Sex") #Antwort: compare sexes
+```
+
+```{r}
+# Bivariate scatterplots
+# pairs(~gamble+income+status+verbal, data=teengamb, main="Pairs Plot") #Antwort: visual relationships
+pairs(teengamb[, c("gamble", "verbal", "income", "status", "sex")])
+```
+
+b) Fit multiple regression model
+```{r}
+# (b) Fit multiple regression model
+mod <- lm(gamble ~ sex + status + income + verbal, data=teengamb)
+```
+
+c) Assumptions: linearity, normality of errors, homoskedasticity, independence
+```{r}
+# (c) Assumptions: linearity, normality of errors, homoskedasticity, independence
+par(mfrow=c(2,2))
+plot(mod)          #Antwort: check residuals vs fitted, QQ, Scale-Location, Cook's
+```
+
+d) Check for influential points
+```{r}
+# (d) Check for influential points
+influ <- influence.measures(mod)
+summary(influ)     #Antwort: shows which obs ("24" and "39") have high Cook's distance, leverage
+# # or
+# influential_points <- which(cooksd > (4 / nrow(teengamb)))
+# print(influential_points)
+# # or
+# rownames(teengamb)[influential_points]
+
+# # Alternatively
+# cutoff <- 4/(nrow(teengamb)-length(coef(mod))-1)
+# which(cooks.distance(mod) > cutoff) #Antwort: indices of influential points
+# # or
+# plot(mod, which = 4)  # Cook's distance
+# cooksd <- cooks.distance(mod)
+# plot(cooksd, type = "h", main = "Cook's Distance", ylab = "Distance")
+# abline(h = 4/length(cooksd), col = "red", lty = 2)
+```
+
+e) Summary of the model
+```{r}
+# (e) Summary of the model
+sum_mod <- summary(mod)
+sum_mod           #Antwort: shows coefficients, R-squared, p-values
+```
+
+f) Difference in predicted expenditure for status 5 vs 4 (others constant)
+```{r}
+# (f) Difference in predicted expenditure for status 5 vs 4 (others constant)
+# Coefficient for status is beta_status, here beta2
+beta_status <- coef(mod)["status"]
+# Difference = beta_status * (5 - 4), so difference is 1
+diff_pred <- beta_status * 1
+diff_pred
+#Antwort: diff_pred = estimated change in gamble for one unit status
+```
+
+g) 90% CI for income coefficient
+```{r}
+# (g) 90% CI for income coefficient
+conf_int <- confint(mod, level=0.90)["income", ]
+conf_int
+# #or 
+# conf_int <- coef(mod)["income"] + c(-1, 1) * qt(0.95, 42) * summary(mod)$coefficients["income", "Std. Error"]
+# conf_int
+# # or
+# b  <- coef(mod)["income"]
+# se <- summary(mod)$coefficients["income", "Std. Error"]
+# df <- df.residual(mod)
+# t  <- qt(0.95, df)
+# conf_int <- b + c(-1, 1) * t * se
+# conf_int
+#Antwort: 90% CI = conf_int
+```
+
+h) Interpret p-value for intercept
+```{r}
+# (h) Interpret p-value for intercept
+p_intercept <- coef(sum_mod)["(Intercept)", "Pr(>|t|)"]
+p_intercept
+#Antwort: tests H0: intercept=0 i.e. expected gamble when all predictors=0
+# Der p-Wert für den Intercept testet, ob der geschätzte mittlere Wert von gamble gleich null ist, unter der Annahme, dass alle erklärenden Variablen (income, status, verbal) den Wert null haben. Ein signifikanter p-Wert zeigt, dass dieser Basiswert von null statistisch signifikant abweicht.
+```
+
+i) Predict for a female (sex=1) earning 8 pounds, status=50, verbal=4
+```{r}
+# (i) Predict for a female (sex=1) earning 8 pounds, status=50, verbal=4
+new_obs <- data.frame(sex=1, status=50, income=8, verbal=4)
+pred <- predict(mod, newdata=new_obs)
+pred
+#Antwort: predicted gamble = pred
+```
+
+j) 95% CI for this prediction
+```{r}
+# (j) 95% CI for this prediction
+pred_ci <- predict(mod, newdata=new_obs, interval="confidence", level=0.95)
+pred_ci
+#Antwort: 95% confidence interval = pred_ci
+```
+
+k) Model selection via AIC
+```{r}
+# (k) Model selection via AIC
+step_mod <- step(mod)
+step_mod           #Antwort: final model by AIC
+
+# #or
+# mod_full <- mod
+# mod_null <- lm(gamble ~ 1, data=teengamb)
+# step_mod <- stepAIC(mod_full, scope=list(lower=mod_null, upper=mod_full), trace=FALSE)
+# step_mod           #Antwort: final model by AIC
+```
+
+Problem 7, Monte Carlo simulation of normal distribution
+a) Simulate for n = 10, 100, 10000
+```{r}
+# Simulation and analysis for X_i ~ N(mu, sigma^2)
+# set.seed(42)
+# 
+# # Given parameters
+# mu_true    <- 0.1
+# sigma_true <- 2
+# 
+# # (a) Simulate for n = 10, 100, 10000
+# n_values <- c(10, 100, 10000)
+# sim_data <- lapply(n_values, function(n) rnorm(n, mean = mu_true, sd = sigma_true))
+# names(sim_data) <- paste0("n", n_values)
+# sim_data
+
+# # or:
+# # (a) Simulation
+# set.seed(42)
+# 
+# mu_true    <- 0.1
+# sigma_true <- 2
+# n_values   <- c(10, 100, 10000)
+# sim_data_list <- vector("list", length(n_values))
+# names(sim_data_list) <- paste0("n", n_values)
+# for (i in seq_along(n_values)) {
+#   n <- n_values[i]
+#   sim_data_list[[i]] <- rnorm(n, mean = mu_true, sd = sigma_true)
+# }
+
+# or
+set.seed(42)
+
+mu_true    <- 0.1
+sigma_true <- 2
+n_values   <- c(10, 100, 10000)
+
+means <- numeric(length(n_values))  # leerer numeric-Vektor
+
+for (i in seq_along(n_values)) {
+  n <- n_values[i]
+  x <- rnorm(n, mean = mu_true, sd = sigma_true)
+  means[i] <- mean(x)               # Mittelwert speichern
+}
+
+names(means) <- paste0("n", n_values)
+print(means)
+```
+
+b) Histograms with theoretical and empirical densities
+```{r}
+# (b) Histograms with theoretical and empirical densities
+par(mfrow = c(1, 3))
+for (i in seq_along(sim_data)) {
+  n   <- n_values[i]
+  x   <- sim_data[[i]] # two brackets because refer to elements of a list
+  # Histogram
+  hist(x, prob = TRUE, main = paste("n =", n), xlab = "x", col = "lightgray")
+  # Theoretical density
+  curve(dnorm(x, mean = mu_true, sd = sigma_true), col = "red", lwd = 2, add = TRUE)
+  # Empirical density
+  lines(density(x), col = "blue", lwd = 2)
+  legend("topright",
+         legend = c("Histogram","Theoretical", "Empirical"),
+         col    = c("lightgray","red","blue"),
+         lwd    = c(NA, 2, 2),
+         pch    = c(15, NA, NA),
+         pt.cex = c(2, NA, NA),
+         bty    = "n")
+}
+
+# # or:
+# # (b) Histogramme
+# par(mfrow = c(1, 3))
+# for (i in seq_along(n_values)) {
+#   x <- sim_data_list[[i]]
+#   n <- n_values[i]
+# 
+#   hist(x, prob = TRUE, main = paste("n =", n), xlab = "x", col = "lightgray")
+#   curve(dnorm(x, mean = mu_true, sd = sigma_true),
+#         col = "red", lwd = 2, add = TRUE)
+#   lines(density(x), col = "blue", lwd = 2)
+#   legend("topright",
+#          legend = c("Histogram", "Theoretical", "Empirical"),
+#          col    = c("black","red","blue"), lty = c(NA,1,1),
+#          pch    = c(15,NA,NA), pt.cex = c(2,NA,NA), bty = "n")
+# }
+```
+
+c) Estimate mu and 95% exact CI for each n
+```{r}
+# (c) Estimate mu and 95% exact CI for each n
+ci_results <- lapply(sim_data, function(x) {
+  n      <- length(x)
+  xbar   <- mean(x)
+  s      <- sd(x)
+  stderr <- s / sqrt(n)
+  df     <- n - 1
+  tval   <- qt(0.975, df)
+  ci     <- xbar + c(-1, 1) * tval * stderr
+  list(mean = xbar, CI = ci)
+})
+#Answer: ci_results contains estimates and 95% CIs
+print(ci_results)
+
+# # or:
+# # (c) Schätzungen und 95%-CI (exact)
+# ci_results2 <- vector("list", length(n_values))
+# for (i in seq_along(n_values)) {
+#   x      <- sim_data_list[[i]]
+#   n      <- length(x)
+#   xbar   <- mean(x)
+#   s      <- sd(x)
+#   stderr <- s / sqrt(n)
+#   tcrit  <- qt(0.975, df = n - 1)
+#   ci_low  <- xbar - tcrit * stderr
+#   ci_high <- xbar + tcrit * stderr
+#   ci_results2[[i]] <- list(mean = xbar, CI = c(ci_low, ci_high))
+# }
+# names(ci_results2) <- names(sim_data_list)
+# print(ci_results2)
+```
+
+d) Test H0: mu = 0 using t-test for each n
+```{r}
+# (d) Test H0: mu = 0 using t-test for each n
+test_results <- lapply(sim_data, function(x) t.test(x, mu = 0))
+test_results
+#Answer: print p-values and CIs (we computed before)
+lapply(test_results, function(res) list(p.value = res$p.value, conf.int = res$conf.int))
+
+# # or:
+# # (d) Test H0: mu = 0 mit t.test
+# test_results2 <- vector("list", length(n_values))
+# for (i in seq_along(n_values)) {
+#   x <- sim_data_list[[i]]
+#   test_results2[[i]] <- t.test(x, mu = 0)
+# }
+# names(test_results2) <- names(sim_data_list)
+# # Ausgeben von p-Wert und CI:
+# for (nm in names(test_results2)) {
+#   tr <- test_results2[[nm]]
+#   cat(nm, ": p-value =", round(tr$p.value, 4),
+#       ", 95% CI = [", round(tr$conf.int[1],3), ",",
+#                     round(tr$conf.int[2],3), "]\n")
+# }
+```
+
+
+Problem extra, Draw 100 values from a distribution with the density fY (y) = c * y * (y - 1); y E [0; 1], where c is a normalizing constant.
+```{r}
+# zuerst normalisieren, dh. c bestimmen durch Intergral-RG, c=6, danach Beta-Verteilung erkennen: Man normalisiert erst, erkennt dann das Muster 
+# yα−1(1−y)β-1y α−1 (1−y) β−1 und kommt sofort auf die Beta-Verteilung beta(2,2), um daraus zu simulieren.
+# (i) Draw 100 samples from f_Y(y) = 6 y (1 - y), y in [0,1]
+set.seed(123)
+y_samples <- rbeta(100, shape1 = 2, shape2 = 2) # beta(2,2)
+
+# Quick check: histogram vs theoretical curve
+hist(y_samples, prob = TRUE,
+     main = "Samples from f_Y(y) = 6 y (1-y)",
+     xlab = "y", col = "lightgray", breaks = 15)
+curve(6 * x * (1 - x), from = 0, to = 1, add = TRUE, col = "blue", lwd = 2)
+```
+
+Problem 8, EDA water transfer chorion, permutation
+```{r}
+# permutation function
+perm_test <- function(x, y) {
+n <- 1000 # Number of permutation
+tobs <- median(x) - median(y) # Observed median difference
+all.data <- c(x, y) # Sotre the data without the group label
+tsim <- array(0, n) # Preallocation for permuted test statistic
+for (i in 1:n) {
+index <- sample(1:length(all.data), length(x), replace = F) # Random permutation
+medianxA <- median(all.data[index]) # Sample median group A
+medianxB <- median(all.data[-index]) # Sample median group B
+tsim[i] <- medianxA - medianxB # Permuted median difference for current iteration
+}
+return(sum(abs(tsim) >= abs(tobs))/n) # Sample p-value
+}
+
+# laod the data set
+watertransfer <- read.csv("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/07water_transfer.csv", header=TRUE, sep=",")
+
+# 3. Datenstruktur ansehen: Variablen, Typen, Anzahl Beobachtungen
+str(watertransfer)
+
+# 4. Zusammenfassung der wichtigsten Kennzahlen
+summary(watertransfer)
+
+yA <- watertransfer[watertransfer$age == "12-26 Weeks", 1] # Store samples
+yB <- watertransfer[watertransfer$age == "At term", 1]
+set.seed(14)
+perm_test(yA, yB) # Permutation test
+```
+
+
+Final exam 2021, part B
+
+Problem 9
+
+a) EDA of prostate from faraway
+```{r}
+require(faraway)
+data(prostate)
+str(prostate)
+pairs(prostate)
+```
+
+b) Fit a multiple regression model with lpsa as a the response and the remaining variables as the predictors.
+```{r}
+fit <- lm(lpsa ~ ., data = prostate)
+summary(fit)
+```
+
+c) Assumptions of the linear model and influential points
+```{r}
+par(mfrow = c(1, 2))
+plot(fit)
+# From the residual vs fitted plot we see that the variance is constant. The QQ-plot shows that the errors are normally distributed. We now check for influential points.
+install.packages("olsrr")
+library(olsrr)
+# require("olsrr")
+ols_plot_cooksd_bar(fit)
+# We see that we have some influential points. 
+```
+
+d) Show the summary of the model
+```{r}
+summary(fit)
+```
+
+e) Use the AIC criterion to choose the best model
+```{r}
+step(fit)
+fit_step <- lm(formula = lpsa ~ lcavol + lweight + age + lbph + svi, data = prostate)
+```
+
+f) compute vif (variance inflation factors) and comment the results
+```{r}
+require(car)
+vif(fit_step)
+# We have no apparent multicollinearity (all VIFs < 5)
+```
+
+g) If all other predictors are held constant, what would be the difference in predicted lpsa for a person with log(prostate weight) 3, compared to a person with log(prostate weight) 4?
+```{r}
+summary(fit_step)$coefficients
+# The difference is given by the estimate of the coeffcient of lweight, which is 0.42369200 (actually with a minus sign, since 3 < 4 and the estimate of the coeffcient is positive).
+```
+
+h) What is the 99% confidence interval of the svi coefficient in this model?
+```{r}
+confint(fit_step, level = 0.99)
+# So, the confidence interval is [0:17102616; 1:27088382]. The p-value of the coefficient svi is very low (see part (g)), so it is significant. Here, we are testing the hypothesis H0 : beta5 = 0.
+```
+
+i) What is a predicted value of lpsa for a 50 year old men?
+```{r}
+predict(fit_step, newdata = data.frame(lcavol = 1, lweight = 3, age = 50, lbph = 1, svi = 0, lcp = -1, gleason = 7, pgg45 = 60), interval = "predict")
+# The predicted value is 2.154909 and the 95% prediction interval is [0.6896339 3.620183].
+```
+
+Problem 9, bivariate Monte Carlo simulation of a normal distribution
+a) simulate 1000 points and plot them
+```{r}
+require(mvtnorm)
+set.seed(1)
+mu <- c(169, 73)
+sigma <- matrix(c(95, 130, 130, 210), ncol = 2)
+res <- rmvnorm(n = 1000, mean = mu, sigma = sigma)
+plot(res, xlab = "height", ylab = "weight", pch = 20, col = "black")
+```
+
+b) Plot the histogram and the empirical density of weight. Add to this plot the theoretical density of weight from the considered distribution. Which of the distributions (joint/marginal/conditional) does it correspond to?
+```{r}
+hist(res[,2], main = "Histogram of weight", prob = TRUE, xlab = "weight")
+lines(density(res[,2]), col = "red") # empirical density
+yy <- seq(20, 120, length.out = 100)
+lines(yy, dnorm(yy, mean = 73, sd = sqrt(210)), col = "green") # true marginal density
+# The shown histogram corresponds to the marginal distribution.
+```
+
+c) Estimate the parameters of the distribution. Compare it with the theoretical parameters.
+```{r}
+colMeans(res)
+cov(res)
+# They are similar to the true values.
+```
+
+d) Create a vector BMI, in which you compute the BMI for each of the simulated points.
+```{r}
+BMI <- res[, 2]/(res[, 1]/100)^2
+```
+
+e) Approximate the probability, that a random man has the BMI >= 30.
+```{r}
+mean(BMI >= 30)
+```
+
+f) Plot again your simulated points and use a different color if the BMI >= 30.
+```{r}
+plot(res, xlab = "height", ylab = "weight", pch = 20, col = "black")
+points(res[res[, 2]/(res[, 1]/100)^2 >=30, ], col = "red", pch = 20)
+```
+
+Problem extra, MC of using any method, sample 1000 points from a distribution, we will use the rejection sampling algorithm.
+```{r}
+optimize(function(x){x*(1-x)^2*(x-1)^4}, c(0, 1), maximum = TRUE)
+
+set.seed( 14)
+n.sim <- 11000
+m <- 0.2
+fstar <- function(x) {
+x*(1-x)^2*(x-1)^4 # unnormalized target
+}
+f_Z <- function(y) {
+ifelse(y >= 0 & y <= 1, 1, 0) # proposal density
+}
+result <- sample <- rep(NA, n.sim)
+for (i in 1:n.sim) {
+sample[i] <- runif(1)
+u <- runif(1)
+if(u < fstar(sample[i]) /(m * f_Z(sample[i]))) # if accept ...
+result[i] <- sample[i]
+}
+samples_final <- na.omit(result)[1:1000]
+# samples_final
+```
+
+
+Final exam 2022, part B
+
+Problem 10, EDA on seatpos in faraway
+```{r}
+library("faraway")
+summary(seatpos)
+plot(seatpos)
+round(cor(seatpos), 3)
+plot(density(seatpos$hipcenter))
+model_1 <- lm(hipcenter ~ ., data = seatpos)
+par(mfrow = c(2, 2), oma = c(0.5, 0.5, 0.5, 0.5), mar = c(1,
+1, 1, 1))
+plot(model_1)
+summary(influence.measures(model_1))
+summary(model_1)
+vif(model_1)
+step(model_1)
+model_2 <- lm(hipcenter ~ Age + HtShoes + Leg, data = seatpos)
+confint(model_2, level = 0.9)
+summary(model_2)
+predict(model_2, data.frame(Age = 40, Leg = 30, Weight = 180,
+HtShoes = 160, Ht = 170, Seated = 90, Arm = 35, Thigh = 45))
+predict(model_2, data.frame(Age = 40, Leg = 30, Weight = 180,
+HtShoes = 160, Ht = 170, Seated = 90, Arm = 35, Thigh = 45),
+interval = "prediction")
+```
+
+Problem 11, Monte Carlo
+a) Sample 1000 observations from X. Plot the histogram of sampled values. Add to the plot the theoretical probability mass function of X. Comment on the result.
+```{r}
+set.seed(1234)
+stu <- rbinom(1000, 50, 0.4)
+par(mfrow = c(1, 1))
+hist(stu, probability = T, ylim = c(0, 0.12))
+points(x = 0:50, y = dbinom(0:50, size = 50, prob = 0.4), col = "red")
+abline(v = 20, col = "blue")
+```
+
+b) Sample one observation from X. Estimate parameter p based on the observation.
+Compute Wald confidence interval for p.
+```{r}
+set.seed(1111)
+unique_sample <- rbinom(1, 50, 0.4)
+x_mean <- unique_sample/50
+wald_confidence <- x_mean + c(-1, 1) * 1.96 * sqrt((x_mean * (1 - x_mean))/50)
+wald_confidence
+```
+
+c) Now we would like to compute for what percentage of samples from X, if we test the hypothesis that the true parameter p = 0:4, we will get a significant result at 5% significance level.
+```{r}
+res_p_value <- numeric(1000)
+for (ii in 1:1000) {
+x <- rbinom(n = 1, size = 50, prob = 0.4)
+a <- prop.test(x = x, n = 50, p = 0.4)
+res_p_value[ii] <- a$p.value
+}
+mean(res_p_value < 0.05)
+```
+
+d) Now we would like to compare the one observation from X with the data simulated from Y ~ Bin(40; 0:3). Sample data from Y. Use R to compare data simulated from X and from Y. Run a test in R to check if the proportions in these two groups are the same. Comment on the result (reject the null hypothesis stating p1 = p2 ?)
+```{r}
+set.seed(1234)
+second_uns <- rbinom(n = 1, size = 40, prob = 0.3)
+prop.test(c(unique_sample, second_uns), c(50, 40))
+```
+
+Problem 12, test what percentage of p.values is below a given significance level.
+```{r}
+extra_fun <- function(N, size, p, alpha) {
+res_p_value <- numeric(N)
+for (ii in 1:N) {
+x <- rbinom(n = 1, size = size, prob = p)
+a <- prop.test(x = x, n = size, p = p, conf.level = alpha)
+res_p_value[ii] <- a$p.value
+}
+return(mean(res_p_value < alpha))
+}
+
+set.seed(1234)
+
+N = 10000
+size = 100
+p = 0.7
+alpha = 0.01
+
+extra_fun(N=N, size=size, p=p, alpha=alpha)
+```
+
+
+Final exam 2023, part B
+
+Problem 13, EDA on trees
+
+a) Load data and EDA
+```{r}
+# Load required libraries
+library(MASS)    # for mvrnorm
+library(ggplot2) # for plotting
+
+# (a) Load data and EDA
+# Use built-in trees dataset
+data(trees)
+# Inspect
+head(trees)    # Answer: first 6 rows of Girth, Height, Volume
+str(trees)     # Answer: 31 obs. of 3 variables: numeric
+summary(trees) # Answer: summary stats
+
+# Univariate histograms and scatter
+par(mfrow=c(2,2))
+hist(trees$Girth, main="Histogram of Diameter (Girth)", xlab="Girth (in)", col="lightblue") # Answer: distribution
+hist(trees$Height, main="Histogram of Height", xlab="Height (ft)", col="lightgreen") # Answer: distribution
+hist(trees$Volume, main="Histogram of Volume", xlab="Volume (cubic ft)", col="lightpink") # Answer: distribution
+```
+
+```{r}
+pairs(trees, main="Pairs Plot: Girth, Height, Volume") # Answer: bivariate relationships
+```
+
+b) Estimate bivariate normal parameters for Girth & Height
+```{r}
+# (b) Estimate bivariate normal parameters for Girth & Height
+data_bi <- trees[, c("Girth","Height")]
+mu_hat  <- colMeans(data_bi)        # Answer: sample mean vector
+Sigma_hat <- cov(data_bi)           # Answer: sample covariance matrix
+mu_hat; Sigma_hat
+```
+
+c) Simulate N=1000 from estimated MVN
+```{r}
+# (c) Simulate N=1000 from estimated MVN
+set.seed(123)
+N <- 1000
+sim_bi <- mvrnorm(N, mu = mu_hat, Sigma = Sigma_hat)
+colnames(sim_bi) <- c("Girth","Height")
+```
+
+d) Histogram & densities of simulated Height
+```{r}
+# (d) Histogram & densities of simulated Height
+height_sim <- sim_bi[, "Height"]
+hist(height_sim, prob=TRUE, main="Simulated Height: Histogram + Densities", xlab="Height (ft)", col="gray")
+# theoretical marginal: Normal with mean mu_hat["Height"] and sd = sqrt(Sigma_hat["Height","Height"])
+curve(dnorm(x, mean=mu_hat["Height"], sd=sqrt(Sigma_hat["Height","Height"])), add=TRUE, col="red", lwd=2)
+# empirical density
+lines(density(height_sim), col="blue", lwd=2)
+# Answer: The red curve is the marginal distribution of Height under the bivariate normal.
+```
+
+e) Create new column HD = Height * Girth^2 in original data
+```{r}
+# (e) Create new column HD = Height * Girth^2 in original data
+trees$HD <- trees$Height * trees$Girth^2
+# Answer: HD column added; head(trees$HD)
+```
+
+f) Approximate P(HD > 15000) using simulation
+```{r}
+# (f) Approximate P(HD > 15000) using simulation
+girth_sim <- sim_bi[, "Girth"]
+hd_sim    <- sim_bi[, "Height"] * girth_sim^2
+p_gt_15000 <- mean(hd_sim > 15000)
+# Answer: estimated probability = p_gt_15000
+```
+
+g) Plot simulated points, color by HD>15000
+```{r}
+# (g) Plot simulated points, color by HD>15000
+ggplot(data = data.frame(sim_bi, HD=hd_sim), aes(x=Girth, y=Height, color=HD>15000)) +
+  geom_point(alpha=0.6) +
+  scale_color_manual(values = c("black","red"), name = "HD>15000") +
+  labs(title="Simulated Girth vs Height", x="Girth (in)", y="Height (ft)") +
+  theme_minimal()
+# Answer: red points have HD>15000
+```
+
+Problem 14, The goal is to simulate the data (~exp) and analyze them using robust tests. 
+
+a) Robust analysis of two iid Exp(1) samples, Sample x1...x20 and y1...y20
+```{r}
+# Robust analysis of two iid Exp(1) samples
+set.seed(123)
+
+# (a) Sample x1...x20 and y1...y20
+x <- rexp(20, rate = 1)
+y <- rexp(20, rate = 1)
+#Antwort: x and y are drawn from Exp(1)
+```
+
+b) Check for outliers via boxplots
+```{r}
+# (b) Check for outliers via boxplots
+par(mfrow = c(1,2))
+boxplot(x, main = "Boxplot of x", ylab="Values")
+boxplot(y, main = "Boxplot of y", ylab="Values")
+#Antwort: Use the whiskers and points to see if any values fall beyond them (potential outliers).
+```
+
+c) Compare with robust test: Wilcoxon rank-sum test (no normality assumption)
+```{r}
+# (c) Compare with robust test: Wilcoxon rank-sum test (no normality assumption)
+wilcox_res <- wilcox.test(x, y, alternative = "two.sided")
+#Antwort: p-value = wilcox_res$p.value -> indicates if distributions differ.
+```
+
+d) Permutation test for difference in medians
+```{r}
+# (d) Permutation test for difference in medians
+perm_test_median <- function(x, y, R = 1000) {
+  tobs <- median(x) - median(y)
+  all_data <- c(x, y)
+  n_x <- length(x)
+  tsim <- numeric(R)
+  for (i in seq_len(R)) {
+    perm <- sample(all_data)
+    med_x <- median(perm[1:n_x])
+    med_y <- median(perm[(n_x+1):length(all_data)])
+    tsim[i] <- med_x - med_y
+  }
+  p_val <- mean(abs(tsim) >= abs(tobs))
+  return(p_val)
+}
+#Antwort: Function perm_test_median defined.
+```
+
+e) Apply permutation test and comment
+```{r}
+# (e) Apply permutation test and comment
+p_perm <- perm_test_median(x, y, R = 1000)
+#Antwort: p-value from permutation median test = p_perm.
+# If p_perm < 0.05, reject H0 of equal medians, else no evidence to reject.
+```
+
+Problem extra, MC p-value simulation for ~exp
+```{r}
+# Simulation of p-value distributions for t-test vs. permutation median test
+set.seed(42)
+
+N <- 10000  # number of simulation runs
+n1 <- 20    # sample size per group
+
+# Preallocate vectors for p-values
+t_pvalues     <- numeric(N)
+p_perm_values  <- numeric(N)
+
+# Define permutation median test function from before
+perm_test_median <- function(x, y, R = 1000) {
+  tobs <- median(x) - median(y)
+  all_data <- c(x, y)
+  n_x <- length(x)
+  tsim <- numeric(R)
+  for (i in seq_len(R)) {
+    perm <- sample(all_data)
+    med_x <- median(perm[1:n_x])
+    med_y <- median(perm[(n_x+1):length(all_data)])
+    tsim[i] <- med_x - med_y
+  }
+  p_val <- mean(abs(tsim) >= abs(tobs))
+  return(p_val)
+}
+
+# Main simulation loop
+for (i in seq_len(N)) {
+  # (a) draw two independent Exp(1) samples
+  x <- rexp(n1, rate = 1)
+  y <- rexp(n1, rate = 1)
+
+  # (a) two-sample t-test (unequal variance default)
+  t_res <- t.test(x, y)
+  t_pvalues[i] <- t_res$p.value
+
+  # (b) robust permutation median test (with R=200 permutations for speed)
+  p_perm_values[i] <- perm_test_median(x, y, R = 200)
+}
+
+# t_pvalues # nicht laufen lassen, geht zu lange
+# p_perm_values # nicht laufen lassen, geht zu lange
+```
+
+a) Histogram of t-test p-values
+```{r}
+# (a) Histogram of t-test p-values
+hist(t_pvalues, breaks = 50, prob = TRUE,
+     main = "Histogram of p-values from t-test (Exp(1) samples)",
+     xlab = "p-value",
+     col = "lightblue")
+abline(h = 1, col = "red", lwd = 2) # uniform density = 1 on [0,1]
+#Answer: p-values are roughly uniform if test respects Type I error.
+```
+
+b) Histogram of permutation median test p-values
+```{r}
+# (b) Histogram of permutation median test p-values
+hist(p_perm_values, breaks = 50, prob = TRUE,
+     main = "Histogram of p-values from median permutation test",
+     xlab = "p-value",
+     col = "lightgreen")
+abline(h = 1, col = "red", lwd = 2)
+#Answer: p-values also appear approximately uniform under H0, validating test calibration.
+
+# Comment:
+# Both histograms show an approximately flat distribution of p-values across [0,1],
+# indicating that under the null hypothesis (samples from identical Exp(1) distributions),
+# both the t-test and the permutation median test maintain the nominal Type I error rate.
+```
+
+
+Final Exam 2024, Part B
+
+Problem 16, Beta (3,2) sampling
+
+a) Generate 1000 samples from f(x) = c x^2 (1 - x), x in (0,1)
+   Recognize Beta(3,2): density ~ x^(3-1)*(1-x)^(2-1)/B(3,2) => c = 12
+```{r}
+# (a) Generate 1000 samples from f(x) = c x^2 (1 - x), x in (0,1)
+# Recognize Beta(3,2): density ~ x^(3-1)*(1-x)^(2-1)/B(3,2) => c = 12
+set.seed(2025)
+n <- 1000
+x <- rbeta(n, shape1 = 3, shape2 = 2)  # samples
+# Antwort: generated 1000 Beta(3,2) samples
+```
+
+b) Histogram + theoretical density + empirical density
+```{r}
+# (b) Histogram + theoretical density + empirical density
+hist(x, prob = TRUE, breaks = 30, col = "lightgray",
+     main = "Samples vs. Theoretical Density: f(x)=12 x^2 (1-x)",
+     xlab = "x")
+# theoretical density curve
+curve(12 * x^2 * (1 - x), from = 0, to = 1, add = TRUE, col = "red", lwd = 2)
+# empirical kernel density
+lines(density(x), col = "blue", lwd = 2)
+legend("topright",
+       legend = c("Histogram","Theoretical", "Empirical"),
+       fill   = c("lightgray", NA, NA),
+       border = c("black", NA, NA),
+       lty    = c(NA, 1, 1),
+       col    = c("black","red","blue"),
+       lwd    = c(NA,2,2),
+       pt.cex = 1,
+       bty    = "n")
+# Antwort: red = theoretical Beta(3,2) density; blue = empirical density
+```
+
+c) Approximate mean, variance, and P(X < 0.7)
+```{r}
+# (c) Approximate mean, variance, and P(X < 0.7)
+mean_emp  <- mean(x)
+var_emp   <- var(x)
+prob_emp  <- mean(x < 0.7)
+
+# Theoretical values:
+mean_th  <- 3 / (3 + 2)
+var_th   <- (3 * 2) / (((3 + 2)^2) * (3 + 2 + 1))
+prob_th  <- pbeta(0.7, shape1 = 3, shape2 = 2)
+
+# Print results
+results <- data.frame(
+  Quantity      = c("Mean","Variance","P(X<0.7)"),
+  Empirical     = c(mean_emp, var_emp, prob_emp),
+  Theoretical   = c(mean_th, var_th, prob_th)
+)
+print(results)
+# Antwort:
+# Empirical mean ≈ mean_emp, theoretical mean = 0.6
+# Empirical variance ≈ var_emp, theoretical variance = 0.04
+# Empirical P(X<0.7) ≈ prob_emp, theoretical P(X<0.7) = pbeta(0.7,3,2)
+```
+
+Problem 17, EDA of fat
+
+a) Load the data
+```{r}
+# (a) Load the data
+fat <- read.csv("https://user.math.uzh.ch/baranczuk/exam/fat.csv")
+#Answer: data loaded into 'fat'
+```
+
+b) Subset to relevant variables
+```{r}
+# (b) Subset to relevant variables
+vars <- c("Perc.body.fat.Siri","Age","Weight","Height",
+          "Neck.circ","Chest.circ","Abdomen.circ","Hip.circ",
+          "Thigh.circ","Knee.circ","Ankle.circ","Biceps.circ",
+          "Forearm.circ","Wrist.circ")
+fat_sub <- fat[, vars]
+
+# EDA
+head(fat_sub)   #Answer: show first rows
+str(fat_sub)    #Answer: structure of variables
+summary(fat_sub)#Answer: summary statistics
+
+# Univariate histograms
+par(mfrow=c(4,4), mar=c(3,3,2,1))
+for(v in names(fat_sub)) hist(fat_sub[[v]], main=v, xlab="", col="lightgray")
+#Answer: histograms show distribution/skew/outliers
+```
+
+```{r}
+# Pairs plot for a few key predictors vs response
+description_vars <- c("Perc.body.fat.Siri","Weight","Abdomen.circ","Wrist.circ")
+pairs(fat_sub[, description_vars], main="Pairs Plot")
+#Answer: scatter relationships
+```
+
+c) Fit full multiple regression model
+```{r}
+# (c) Fit full multiple regression model
+mod_full <- lm(Perc.body.fat.Siri ~ ., data = fat_sub)
+```
+
+d) Check linear model assumptions
+```{r}
+# (d) Check linear model assumptions
+# autoplot(mod_full) # if ggfortify loaded alternatively:
+par(mfrow=c(2,2))
+plot(mod_full)     #Answer: check linearity, normality of residuals, homoskedasticity, Cook's Distance
+
+# Influential points
+infl <- influence.measures(mod_full)
+summary(infl)     #Answer: identifies influential obs via Cook's D, leverage, etc.
+which(apply(infl$is.inf,1,any)) #Answer: indices of influential cases
+```
+
+e) Show summary of full model
+```{r}
+# (e) Show summary of full model
+sum_full <- summary(mod_full)
+sum_full          #Answer: coefficients, R-sq, F-statistic
+```
+
+f) Predictors significant at 1% level
+```{r}
+# (f) Predictors significant at 1% level
+sig1 <- coef(sum_full)[,4] < 0.01
+names(sig1)[sig1] #Answer: names of predictors with p < 0.01
+```
+
+g) Interpretation of F-statistic
+```{r}
+# (g) Interpretation of F-statistic
+#Answer: The F-statistic tests H0 that all slope coefficients = 0 vs at least one != 0. A large F and small p-value indicate model explains significant variance.
+```
+
+h) Model selection via AIC
+```{r}
+# (h) Model selection via AIC
+library(MASS)
+mod_step <- stepAIC(mod_full, trace=FALSE)
+summary(mod_step)  #Answer: summary of selected model
+```
+
+i) Difference in predicted Perc.body.fat.Siri for Wrist.circ 12 vs 22
+```{r}
+# (i) Difference in predicted Perc.body.fat.Siri for Wrist.circ 12 vs 22
+beta_wrist <- coef(mod_step)["Wrist.circ"]
+diff_pred <- beta_wrist * (22 - 12)
+#Answer: diff_pred = change in predicted body fat percent for +10 cm wrist
+```
+
+j) Prediction for specified new individual using selected model
+```{r}
+# (j) Prediction for specified new individual using selected model
+new_vals <- data.frame(
+  Age         = 25,
+  Weight      = 170,
+  Height      = 70,
+  Neck.circ   = 40,
+  Chest.circ  = 100,
+  Abdomen.circ= 90,
+  Hip.circ    = 100,
+  Thigh.circ  = 60,
+  Knee.circ   = 40,
+  Ankle.circ  = 20,
+  Biceps.circ = 30,
+  Forearm.circ= 30,
+  Wrist.circ  = 20
+)
+pred_new <- predict(mod_step, newdata=new_vals, interval = "prediction", level=0.95)
+#Answer: predicted value and 95% prediction interval = pred_new
+```
+
+k) 99% confidence interval for Wrist.circ coefficient
+```{r}
+# (k) 99% confidence interval for Wrist.circ coefficient
+ci99 <- confint(mod_step, "Wrist.circ", level=0.99)
+#Answer: 99% CI for Wrist.circ = ci99
+# Interpretation of p-value: tests H0: coefficient of Wrist.circ = 0 (no effect) vs Ha: !=0.
+```
+
+Problem extra, fat analysis with boots trapping, Compute the 99% confidence interval of the Wrist.circ coefficient in the model above using bootstrapping.
+```{r}
+# (k) Bootstrap 99% CI for the Wrist.circ coefficient
+
+# 1. Define a boot-statistic function that refits the same model and returns the Wrist.circ coef
+boot_coef <- function(data, indices) {
+  d  <- data[indices, , drop = FALSE]
+  m  <- lm(formula(mod_step), data = d)
+  coef(m)["Wrist.circ"]
+}
+
+# 2. Load boot package and perform 2000 bootstrap replications
+library(boot)
+set.seed(2025)
+boot_res <- boot(data = fat_sub, statistic = boot_coef, R = 2000)
+
+# 3. Extract the 99% percentile‐based interval
+boot_ci <- boot.ci(boot_res,
+                   type  = "perc",
+                   index = 1,       # first (and only) statistic returned by boot_coef
+                   conf  = 0.99)
+
+# 4. Print the lower and upper bounds
+ci_bootstrap_99 <- boot_ci$percent[4:5]
+names(ci_bootstrap_99) <- c("2.5%", "97.5%")
+print(ci_bootstrap_99)
+# If this interval does not contain 0, you have strong evidence (at the 1% level) that wrist circumference truly influences predicted body fat. The bootstrap approach makes no extra parametric assumptions about the sampling distribution of the estimator.
+```
+
+
+Exam FS 2023, Problem 1, EDA of cathedral data from package faraway
+
+Problem 1 – Analysis of Medieval Cathedrals
+
+(a) Exploratory Data Analysis (EDA)
+
+The dataset contains the height and total length of medieval cathedral naves, categorized by style. We examine the distribution and relationship visually and statistically.
+```{r}
+library(faraway)
+data("cathedral")
+head(cathedral)
+
+plot(cathedral$x, cathedral$y, col = cathedral$style,
+     xlab = "height (ft.)", ylab = "total length (ft.)",
+     main = "Cathedrals: Height vs. Total Length")
+legend("topleft", legend = c("Gothic", "Romanesque"),
+       col = c("1", "2"), pch = 1, cex = 0.7)
+
+summary(cathedral)
+
+par(mfrow = c(1, 2))
+plot(density(cathedral$x), main = "Density of Heights")
+plot(density(cathedral$y), main = "Density of Lengths")
+```
+
+(b) Fit a linear model: height \~ total length
+We model the relationship between nave height and length using simple linear regression.
+```{r}
+lmodel <- lm(x ~ y, data = cathedral)
+```
+
+(c) Check the model assumptions
+We check for normality, homoscedasticity, and linearity of residuals using diagnostic plots.
+```{r}
+par(mfrow = c(2, 2), oma = c(0, 0, 0, 0), mar = c(2, 1, 1.2, 1))
+plot(lmodel)
+```
+
+The residual plots show some deviation from normality (right-skewed) and unequal spread. These may result from the small sample size.
+
+(d) Model summary
+
+We summarize the regression model to assess coefficient significance and fit quality.
+```{r}
+summary(lmodel)
+```
+
+The slope for length is statistically significant (p < 0.001). The R-squared value of \~0.41 indicates that about 41% of the variation in height is explained by length.
+
+(e) Predicted change in height when length increases by 1 ft
+We extract the slope coefficient, which represents the change in expected height per unit increase in length.
+```{r}
+lmodel$coefficients[2]
+```
+
+An increase in length by 1 foot is associated with an increase in expected height by approximately 0.087 ft.
+
+(f) 90% Confidence interval for the slope
+We calculate the 90% confidence interval for the length coefficient.
+```{r}
+confint(lmodel, level = 0.9)[2, ]
+```
+
+The 90% confidence interval for the slope lies between approximately 0.050 and 0.125.
+
+(g) Interpretation of p-value for intercept
+The p-value for the intercept tests whether the expected height is 0 when the length is 0:
+* Null hypothesis: H_0: \beta_0 = 0
+* Alternative: H_A: \beta_0 \neq 0
+Since the p-value is < 0.001, we reject H_0 and conclude that the intercept is significantly different from 0.
+
+(h) Predicted height for a width of 50 meters
+We convert 50 meters to feet (\~164.042 ft) and use the model to predict the height.
+```{r}
+width_50m <- 50 * 3.28084
+lmodel$coefficients[1] + width_50m * lmodel$coefficients[2]
+```
+
+The expected height for a 50-meter wide nave is approximately 51.89 ft, or about 15.8 meters.
+
+(i) 95% Confidence interval for the predicted value
+We compute the 95% confidence interval for the predicted mean height.
+```{r}
+predict(lmodel, newdata = data.frame(y = width_50m), interval = "confidence")
+```
+
+The 95% confidence interval for the predicted mean height at 50 meters width is between 39 ft and 65 ft, or 12 to 19.8 meters.
+
+
+
+
+

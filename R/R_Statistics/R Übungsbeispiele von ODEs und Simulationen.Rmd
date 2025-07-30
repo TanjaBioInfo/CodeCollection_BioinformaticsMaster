@@ -1,0 +1,1249 @@
+---
+title: "R Beispiele und Übungen für ODEs und Simulationen"
+output:
+  pdf_document: default
+  word_document: default
+date: "2024-12-15"
+---
+
+```{r}
+####### R-Übungsbeispiele #############################################
+#######################################################################
+
+# 1.2 Datastructures: Vectors, Matrices, Dataframes
+
+## assigne a vector
+v1 <- 3 # assigne 3 to the variable v1
+
+## concatenation
+v2 <- c(v1, 1, 2) # this concatenates v1 with 1 and 2 and assigns it to v2
+
+## TASK: Using c(), create a vector ”v3” containing the numbers 1 to 5 and 
+## verify that the command 1:5 does the same.
+v3 <- c(v2[c(2, 3)], v1, 4, 5) # diese Lösung ist mit Vector v1 und v2
+v3 <- c(1, 2, v1, 4, 5) # diese Lösung ist mit nur Vecotr v1
+
+## We can combine different vectors of the same length to a matrix 
+## with the commands cbind() (considers them as columns) 
+## or rbind() (considers them as rows).
+## This creates for example a matrix, 
+## whose first row is the vector v2 created before ..
+## ...and the second row is the vector 1 to 3
+## ...and the third row is the vector 2 to 4
+ma1 <- rbind(v2, 1:3, 2:4)
+
+## TASK: Create a matrix ma2 whose first column are the numbers 1 to 5 
+## and whose second column are the numbers 4 to 8.
+ma2 <- cbind(v3, 4:8)
+
+## 1.2.1 Selecting subsets from vectors and matrices
+## Select via numerical indices For vectors v[k] 
+## selects the k’th element of v, 
+## and v[c(k, l,m)] selects the k’th, l’th, and m’th element.
+## This selects the first two elements of v2 and assigns them to v4
+v4 <- v2[c(1,2)]
+v3 <- c(v2[c(2, 3)], v1, 4, 5)
+
+## TASK: Select the first and the third element of v2.
+v2[c(1, 3)]
+
+## Similarly for matrices, ma[k, ] selects the k’th row, ma[, l] s
+# elects the l’th columns, 
+## and ma[k, l] the element in row k and column l. 
+## This can again be extended to more than one row/column, 
+## e.g. ma[c(k1, k2), c(l1, l2)] select the elements whose row is 
+# either k1 or k2 
+## and whose column is either l1 or l2.
+
+## TASK: Select from ma1 the sub-matrix corresponding to 
+## the first two rows and the first two columns.
+ma1[c(1, 2), c(1, 2)]
+
+## Select via names The elements of a vector can be named. 
+## The names can be assigned and viewed via the function names
+## take an example
+v5 <- 1:4
+## This vector is not named yet, Ausgabe (console) ist NULL
+names(v5)
+## Now assign names to its elements
+names(v5) <- c("a", "b", "c", "d")
+## display the named vector
+v5  # a b c d 
+    # 1 2 3 4 
+names(v5) # "a" "b" "c" "d"
+
+## This selects the elements named "a" and "c"
+v5[c("a", "c")]
+## but you can, of course still use the numerical-index-based 
+## selection described above,....
+## ... in this case you can get the same output with..
+v5[c(1, 3)]
+
+## The same strategy applies with small changes to matrices: 
+## The names of the rows and columns of a matrix ma
+## can be assigned with rownames(ma) and colnames(ma), 
+## and ma[rn1, cn1] select the elements with row-name
+## ”rn1” and column-name ”cn1”.
+
+## asign names to ma1
+rownames(ma1) <- c("patient1", "patient2", "patient3")
+colnames(ma1) <- c("variable1", "variable2", "variable3")
+## create subset containing only patients 1 and 3
+ma3 <- ma1[c("patient1", "patient3"), ] # row und nach dem Komma keine col
+#create subset containing only variables 1 and 2
+ma4 <- ma1[ , c("variable1", "variable2")] # keine row und danach Komma, col
+
+## TASK: Create a subset containing only variables 1 and 3 from patients 1 and 2.
+pa12 <- ma1[c("patient1", "patient2"), ]
+pa12va13 <- pa12[ , c("variable1", "variable3")]
+
+## Logical indexing 
+## Logical indexing is one of the most useful features of R. 
+## A logical variable can take two values: 
+## T standing for ”TRUE” or F standing for ”FALSE”. 
+## If now v is a vector and vL is a vector of logical values 
+## of the same length as v, then v[vL] selects only those elements 
+## at which vL has the value T.
+v5 <- c(-1, 2, 3, 4, -2)
+v5[c(T, F, T, F, F)] # This selects the first and the third element
+
+## This feature is so useful because we can obtain logical vectors 
+## as the result of other operations and then use them to select entries.
+v5 < 0 # This creates a logical vector which is true when v5 is smaller 0
+## Ausgabe(console): [1] TRUE FALSE FALSE FALSE TRUE
+## This can now be used to select only the negative elements of v5
+v5[v5 < 0]
+## Ausgabe(console): [1] -1 -2
+## We can for example set those elements to 0
+v5[v5 < 0] <- 0
+v5
+## Ausgabe(console): [1] 0 2 3 4 0
+## Similarly, "==" tests equality
+v5 == 0
+## Ausgabe(console): [1] TRUE FALSE FALSE FALSE TRUE
+## and "!=" inequality
+v5 != 0
+## Ausgabe(console): [1] FALSE TRUE TRUE TRUE FALSE
+
+## TASK: Set in v5 all elements that are not 2 to 1.
+v5[v5 != 2] <- 1
+
+## With the same minor changes as seen above for names and numerical indices 
+## this concept does also apply to matrices; 
+## e.g. ma[vL, ] selects the rows at which vL has the value ”TRUE”.
+
+## TASK: Select from the matrix ma1 only those rows for which 
+## the value in the first column is larger than 1.
+co1 <- ma1[ , 1]
+co1va1 <- co1[co1>1]
+co1va1
+## Ausgabe(console):  patient1 patient3 
+##                           3        2 
+
+## 1.2.2 Data-frames and lists
+## A matrix requires that all its elements are of the same data-type. 
+## the vector "age" gives the ages of the participants of a study ..
+##  .. (it is hence a numeric vector)
+age <- c(20, 25, 27, 18, 45)
+## the vector "initials", their initials (it is hence of type character)
+initials <- c("D.T", "H.C", "B.S", "C.B", "M.P")
+## if we want to combine these two vectors to a matrix by cbind
+cbind(initials, age) # cbind macht dann die column-Names
+##    initials age
+## [1,] "D.T" "20"
+## [2,] "H.C" "25"
+## [3,] "B.S" "27"
+## [4,] "C.B" "18"
+## [5,] "M.P" "45"
+## we see that age is forced to become a character vector
+## (as indicated by the quotation marks)
+
+## This problem is solved by the data-frame structure, 
+## which allows different columns to be of different format.
+participants <- data.frame(initials, age, stringsAsFactors=F)
+## The option stringsAsFactors=F is chosen to avoid that
+## the string variable "initials" is converted into a factor
+## (a data-type we will not consider here)
+## This is how our data.frame looks like
+participants
+## initials age
+## 1    D.T 20
+## 2    H.C 25
+## 3    B.S 27
+## 4    C.B 18
+## 5    M.P 45
+
+## We can select subsets from data.frames in the same way as we have done 
+# for matrices 
+## (numerical indices, names, logical indices).
+participants[ , "age"] # select the column "age", extra als column schreiben, 
+                        # damit es in der Ausgabe nebeneinander gezeigt wird
+## [1] 20 25 27 18 45
+participants[ , "initials"] # select the column "initials", 
+                        # extra als column schreiben, 
+                        # damit es in der Ausgabe nebeneinander gezeigt wird
+## [1] "D.T" "H.C" "B.S" "C.B" "M.P"
+## select all participants with age under 25
+participants[participants[ , "age"]<25, ] # soll in der Ausgabe auch 
+                                          # untereinander gezeigt werden
+## initials age
+## 1    D.T 20
+## 4    C.B 18
+
+## In data-frames there is a second option to select columns via the ”$” sign:
+participants$age # this selects the column "age"
+
+## And a third option with the pipe,”%>%”. 
+## Pipes are a powerful tool for clearly expressing a sequence of multiple operations. 
+## Packages in the tidyverse load ”%>%”for you automatically, 
+## so you don’t usually load magrittr explicitly.
+library(tidyverse) # Load the package tidyverse
+
+participants %>%
+  select(age) # Select the column "age" from the data frame participants
+
+## TASK: select all participants with age under 25 similar to above 
+## but using ”$” and ”%>%” to extract the column with age. 
+## Hint: To subset rows with condition using dplyr, 
+## use the function filter instead of select.
+participants[participants$age<25, ]
+participants[participants[,"age"]<25, ]
+## Falls dplyr noch nicht geladen ist
+library(dplyr)
+participants %>% filter(age < 25)
+
+## One of the most flexible data-structures in R are lists. 
+## In a list we can combine data-structures of any type. 
+## Due to the flexibility of the list structure, many available R functions 
+# give their output in the form of lists.
+list1<-list(participants=participants, v2=v2) # This generates a list whose 
+                                              # first element is a data.frame and
+                                              # whose second element is a vector
+## We can select elements from a list the following way
+## This selects the second element of the list
+list1[[2]]
+## [1] 3 1 2
+## This selects the element with name "v2"
+list1[["v2"]]
+## [1] 3 1 2
+## The same but using a dollar sign:
+list1$v2
+## [1] 3 1 2
+
+## 2 Datasets
+## We will use for the remainder of this exercise two data-sets
+## 1. chsiCourse.csv (CHSI stands Community Health Status Indicators) contains 
+# data on the incidence of
+## death by different causes (given as the number of deaths/100'000 inhabitants per year) 
+# together with
+## behavioural, socio-economic, and life-style data for all the US counties.
+## Check CHSI-Data Sources Definitions And Notes.pdf for details about this data-set.
+## 2. esophCourse.csv contains the data from a case-control study on esophageal cancer.
+## In order to read these two data-sets into R, we first change the work-directory 
+# (i.e. the directory where R looks
+## for and writes files), to the directory that you use for this exercise.
+setwd("/Users/TR/Desktop/BIO 445, quantitative life science/BIO445_01_Intro_to_R_Students") 
+# Workingdirectory in Klammern schreiben
+
+## TASK: read csv.data
+chsi <- read.csv("chsiCourse.csv", stringsAsFactors=F)
+esophCourse <- read.csv("esophCourse.csv", stringsAsFactors=F)
+
+## TASK: The data are read as a data-frame (i.e. the variable chsi is a data-frame). 
+## Check this with the function is.data.frame(df)
+is.data.frame(chsi) # TRUE
+
+## You can view data either by typing the name of the variable of the data-frame 
+# in the command-line 
+## (this is only an option for small data-sets) or with head(df) or view(df)
+head(chsi) # This shows the first lines of the data-set
+view(chsi) # This shows the data as a spread sheet in a separate window
+
+## TASK: Discuss with your neighbour the content of the chsiCourse.csv and 
+# esophCourse.csv data-sets.
+## TASK: Generate a subset chsiCalifornia containing only counties from California 
+## (use the appropriate subsetting approach introduced above).
+chsiCalifornia <- chsi[chsi$CHSI_State_Name.x == "California", ]
+
+## 3 Descriptive Statistics
+## R offers several useful tools for exploring and describing data.
+## For the distribution of (one / single) individual variables:
+## • Histograms
+hist(chsi$Lung_Cancer) # This makes a histogram of the Lung_Cancer incidence
+## • Box-plots
+boxplot(chsi$Lung_Cancer, chsi$Col_Cancer, chsi$Brst_Cancer) # This generates a 
+# box plot for different variables
+## • Tables
+table(chsi$CHSI_State_Name.x) # This shows how many countries there are from each state
+## • The function summary() provides a set of useful summary statistics for 
+## an individual variable or an entire data-set
+# Alabama               Alaska              Arizona             Arkansas           California 
+# 67                   27                   15                   75                   58 
+# Colorado          Connecticut             Delaware District of Columbia              Florida 
+# 64                    8                    3                    1                   67 
+# Georgia               Hawaii                Idaho             Illinois              Indiana 
+# 159                    5                   44                  102                   92 
+# Iowa               Kansas             Kentucky            Louisiana                Maine 
+# ...
+
+summary(chsi) # This summarises the chsi data set
+# Col_Cancer     Lung_Cancer        Suicide           CHD         Brst_Cancer       Obesity          Smoker     
+# Min.   : 9.00   Min.   : 10.50   Min.   : 4.50   Min.   : 59.8   Min.   : 9.50   Min.   : 4.20   Min.   : 3.60  
+# 1st Qu.:18.10   1st Qu.: 49.30   1st Qu.:10.30   1st Qu.:156.9   1st Qu.:22.60   1st Qu.:21.10   1st Qu.:19.40  
+# Median :20.90   Median : 58.40   Median :12.70   Median :187.4   Median :25.80   Median :24.30   Median :23.00  
+# Mean   :21.35   Mean   : 58.64   Mean   :13.54   Mean   :191.1   Mean   :26.33   Mean   :24.15   Mean   :23.11  
+# 3rd Qu.:24.00   3rd Qu.: 67.85   3rd Qu.:15.70   3rd Qu.:221.6   3rd Qu.:29.50   3rd Qu.:27.20   3rd Qu.:26.70  
+# Max.   :46.30   Max.   :166.40   Max.   :91.30   Max.   :412.9   Max.   :62.30   Max.   :42.60   Max.   :46.20  
+# NA's   :225     NA's   :78       NA's   :523     NA's   :19      NA's   :391     NA's   :917     NA's   :874    
+#     Poverty      Few_Fruit_Veg   CHSI_State_Name.x 
+#  Min.   : 2.20   Min.   :63.10   Length:3141       
+#  1st Qu.: 9.80   1st Qu.:75.50   Class :character  
+#  Median :12.60   Median :79.00   Mode  :character  
+#  Mean   :13.35   Mean   :78.92                     
+#  3rd Qu.:16.20   3rd Qu.:82.40                     
+#  Max.   :36.20   Max.   :96.40                     
+#  NA's   :1       NA's   :1237 
+
+## Similarly for the relation between TWO variables:
+##  • Scatter plots
+plot(chsi$Smoker, chsi$Lung_Cancer) # Plots Lung-Cancer incidence as a function 
+                                    # of the percentage of smokers (one data-point -> one dot)
+
+## Now we take a look at the second data frame esophCourse. 
+## This frame contains three variables (age group, alcohol group, tobaco group) 
+## which might be related to the binary outcome of esophagal cancer (0/1).
+## • Cross-tabulation (or contingency table (Cross-tabulation ist die Darstellung 
+# der Häufigkeiten)
+      ## Chi-Quadrat-Test ist der statistische Test, um die Abhängigkeit der Variablen 
+      ## in der Cross-tabulation zu überprüfen.?)
+table(esophCourse$esophBn, esophCourse$tobgp) # This displays the number of data-points 
+                                              # for each combination of the first 
+                                              # and the second variable
+#   0-9g/day 10-19 20-29 30+
+# 0      525   236   132  82
+# 1       78    58    33  31
+
+## These absolute numbers are often not very intuitive. 
+## Showing frequencies is more intuitive. 
+## One very useful and flexible function is CrossTable:
+  # First we have to load the library where this function is from
+  # if you have not installed the package gmodels yet, you can do this with
+  # install.packages("gmodels")
+install.packages("gmodels")
+library(gmodels)
+CrossTable(esophCourse$esophBn, esophCourse$tobgp) # Now we can use Cross table 
+                                                  # the same way as table. 
+                                                  # Note the legend in the first rows.
+# Cell Contents
+# |-------------------------|
+#   |                       N |
+#   | Chi-square contribution |
+#   |           N / Row Total |
+#   |           N / Col Total |
+#   |         N / Table Total |
+#   |-------------------------|
+#   
+#   
+#   Total Observations in Table:  1175 
+# 
+# 
+# | esophCourse$tobgp 
+# esophCourse$esophBn |  0-9g/day |     10-19 |     20-29 |       30+ | Row Total | 
+#   --------------------|-----------|-----------|-----------|-----------|-----------|
+#   0 |       525 |       236 |       132 |        82 |       975 | 
+#   |     1.213 |     0.260 |     0.176 |     1.476 |           | 
+#   |     0.538 |     0.242 |     0.135 |     0.084 |     0.830 | 
+#   |     0.871 |     0.803 |     0.800 |     0.726 |           | 
+#   |     0.447 |     0.201 |     0.112 |     0.070 |           | 
+#   --------------------|-----------|-----------|-----------|-----------|-----------|
+#   1 |        78 |        58 |        33 |        31 |       200 | 
+#   |     5.914 |     1.265 |     0.860 |     7.198 |           | 
+#   |     0.390 |     0.290 |     0.165 |     0.155 |     0.170 | 
+#   |     0.129 |     0.197 |     0.200 |     0.274 |           | 
+#   |     0.066 |     0.049 |     0.028 |     0.026 |           | 
+#   --------------------|-----------|-----------|-----------|-----------|-----------|
+#   Column Total |       603 |       294 |       165 |       113 |      1175 | 
+#   |     0.513 |     0.250 |     0.140 |     0.096 |           | 
+#   --------------------|-----------|-----------|-----------|-----------|-----------|
+
+## • Mosaicplots
+# This is a graphical illustration of a contingency table / cross-tabulation
+ta <- table(esophCourse$esophBn, esophCourse$tobgp)
+mosaicplot(t(ta), col=TRUE)
+
+## Task: Discuss with your neighbour what each of these plots show/”tell” us.
+
+## Task: Using the help-function ? (e.g. ?hist() for the help for histogram), 
+# try to make these plots more
+## beautiful (specify main title, label the axes etc).
+### Histogramm mit Titel und Achsenbeschriftungen
+hist(chsi$Lung_Cancer, 
+     main = "Histogramm der Lungenkrebsfälle", 
+     xlab = "Lungenkrebsfälle", 
+     ylab = "Häufigkeit", 
+     col = "lightblue")
+
+### Boxplot mit Titel und Achsenbeschriftungen
+boxplot(chsi$Lung_Cancer, chsi$Col_Cancer, chsi$Brst_Cancer,
+        main = "Vergleich von Krebsarten",
+        names = c("Lungenkrebs", "Darmkrebs", "Brustkrebs"),
+        xlab = "Krebsarten", 
+        ylab = "Anzahl der Fälle",
+        col = c("lightblue", "lightgreen", "pink"))
+
+### Streudiagramm mit Titel und Achsenbeschriftungen
+plot(chsi$Smoker, chsi$Lung_Cancer,
+     main = "Zusammenhang zwischen Rauchen und Lungenkrebs",
+     xlab = "Anzahl der Raucher",
+     ylab = "Lungenkrebsfälle",
+     col = "blue", pch = 16)
+
+### Mosaikplot mit Titel und Achsenbeschriftungen
+ta <- table(esophCourse$esophBn, esophCourse$tobgp)
+mosaicplot(t(ta),
+           main = "Mosaikplot: Speiseröhrenkrebs und Tabakgebrauch",
+           xlab = "Tabakkonsumgruppen", 
+           ylab = "Speiseröhrenkrebsstadien",
+           col = TRUE)
+
+## 4 Analysing the data
+## Concerning CHSI data we assess the association between lung-cancer and smoking:
+## The command lm(y~x,data=dataframeX) fits a straight line to the variables y and x
+## from the data-set dataframeX.
+mo <- lm(Lung_Cancer~Smoker, data=chsi)
+## the fitted model is assigned to the variable mo
+## The function summary(mo) gives a summary of this model
+summary(mo)
+# Call:
+#   lm(formula = Lung_Cancer ~ Smoker, data = chsi)
+# 
+# Residuals:
+#   Min      1Q  Median      3Q     Max 
+# -42.255  -7.347  -0.186   6.935  67.920 
+# 
+# Coefficients:
+#   Estimate Std. Error t value Pr(>|t|)    
+# (Intercept) 23.75089    1.00516   23.63   <2e-16 ***
+#   Smoker       1.47791    0.04217   35.05   <2e-16 ***
+#   ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 11.42 on 2256 degrees of freedom
+# (883 observations deleted due to missingness)
+# Multiple R-squared:  0.3525,	Adjusted R-squared:  0.3522 
+# F-statistic:  1228 on 1 and 2256 DF,  p-value: < 2.2e-16
+
+## with the following commands we can add the model fit to the scatter plot:
+## plot(), produces the scatter plot :
+plot(Lung_Cancer~Smoker, data=chsi)
+abline(mo, col="blue") # abline() adds the model-line to the scatter
+
+## 4.1 functions
+## A Function in R has the following structure
+## To specify a function, you have to provide 4 types of items with the following syntax:
+name_of_function <- function(input_variables) {
+  # Sequence of R commands
+  output_variable
+}
+
+# COMMENTS
+# name_of_function: Can be freely chosen, follows R naming conventions.
+# input_variables: In the case of more than one input variable, these have to be 
+# separated by commas.
+# Sequence of R commands: Typically process the input and will be executed sequentially.
+# output_variable: The last variable will be returned as the output.
+multiply <- function(x, y){
+  product <- x*y
+  return(product)
+}
+multiply(3, 4)
+## 1_NAME_OF_THE_FUNCTION= multiply
+## 2_NAME_OF_THE_INPUT_VARIABLES: x,y
+## 3_SEQUENCE OF R COMMANDS: product<-x*y
+## 4_NAME_OF_THE_OUTPUT_VARIABLE: product
+## [1] 12
+
+## TASK: Write a function ”circleSurface” in which you enter the radius r of a 
+# circle and it returns its surface.
+circleSurface <- function(r){
+  product <- pi*r
+  return(product)
+}
+circleSurface(1)
+
+## Functions are especially useful for tasks that have to be performed repeatedly 
+# with small variations. Take
+## as an example the linear fit we have considered above. Assume that we want to 
+# extract the p-value for the
+## effect of smoking on lung-cancer and the R-squared of the corresponding model 
+# (the latter tells us what fraction
+## of the variance of Lung-cancer incidence is explained by smoking).
+# These two values are actually hidden in the
+## output of summary(mo). 
+
+modSum <- summary(mo) # summary(mo) produces a list as output, we assign this 
+# to the variable modSum
+names(modSum) # with names(modSum) we see the names of these elements
+modSum$coefficients # the p-values are contained in the element "coefficients"
+modSum$coefficients[ , "Pr(>|t|)"] # and correspond there to the column named "Pr(>|t|)"
+modSum$coefficients[-1, "Pr(>|t|)"] # we are typically not interested in the p-value 
+# for the intercept,
+# hence remove this (remove first row by -1)
+# note that a negative index removes the corresponding element/row/column:
+# e.g. v[-1] returns the vector v without the first element;
+# ma[-1, ] returns the matrix ma without the first row, etc
+
+modSum$r.squared # similarly the R-squared corresponds to the element "r.squared" 
+# and can be extracted too
+
+## Suppose we want to repeatedly extract these summary statistics from many models 
+# (which we will actually do below). 
+## We can simplify this task by writing two functions that do this for us.
+
+### for the p values
+getPvalues <- function(mo){      # this function takes a model as produced by 
+                                  # lm() as an input
+  modSum <- summary(mo)   # make the model summary
+  pvalues <- modSum$coefficients[-1, "Pr(>|t|)"]   # extract the p values
+  return(pvalues)   # return the p values as output
+}
+
+### for the r squared
+getR2 <- function(mo){           # this function takes a model as produced by lm() as an input
+  modSum <- summary(mo)   # make the model summary
+  r2 <- modSum$r.squared   # extract the R-squared
+  return(r2)   # return the R-squared
+}
+
+## We can now get these values from any model mo simply by
+getPvalues(mo) # for the p values, [1] 3.326527e-215
+getR2(mo) # for the r squared, [1] 0.3525103
+
+## We will use it to obtain a better understanding of what a linear fit does.
+## In order to do this, we first have to define a function that produces a straight line 
+## (characterised by its intercept and slope) a measure of how well it fits 
+## the Lung Cancer vs. Smoking data. This is done by the following function:
+
+getSSQ <- function(parm){
+  # We assume that slope and intercept are entered into the function as a vector
+  # of the form parm=c(intercept,slope)
+  # extract slope and intercept from this vector
+  intercept <- parm[1]
+  slope <- parm[2]
+  # calculate the lung-cancer incidence
+  # that the linear model with those parameters would predict
+  yPredicted <- intercept+slope*chsi$Smoker
+  # NOTE: as a side effect, we make this function plot the predicted lung-cancer incidence
+  lines(chsi$Smoker, yPredicted, col=hsv(runif(1)), lwd=0.25)
+  # as a measure of how well the predicted incidence corresponds to the real incidence
+  # we first calculate for each data-point the squared difference between predicted
+  # and real lung-cancer incidence
+  squaredDifference <- (yPredicted-chsi$Lung_Cancer)^2
+  # and then take the sum over all data-points
+  ssq <- sum(squaredDifference, na.rm=T)
+  # (Use the help function to find out what the option na.rm in sum means. remove NAs)
+  # this is then returned as a measure of how well the straight line 
+  # characterized by parm fits the data
+  return(ssq)
+}
+
+## The measure produced by this function is called the sum of squares (SSQ) and 
+# given that this is a measure of
+## how far away the prediction is from the observation, a smaller SSQ indicates 
+# a better prediction. Thus we try
+## to find the linear line with the minimal SSQ. Let’s start with the linear model 
+# obtained by lm(). The intercept
+## and slope (steht bei smoker) of the linear model specified above can be 
+# extracted as (in der Spalte "Estimate"):
+summary(mo)$coefficients[ , "Estimate"]
+## (Intercept)      Smoker 
+## 23.750893    1.477911 
+
+## and we can estimate the SSQ by using the above function as
+getSSQ(summary(mo)$coefficients[ , "Estimate"])
+## [1] 294385
+
+## Task: Test a couple of alternative values for intercept and slope and show 
+# that they give larger SSQs than
+## estimate from lm().
+getSSQ(c(20, 1))  # Intercept = 20, Slope = 1
+
+## The best fit of the data is thus provided by the straight line which minimises the SSQ. 
+# We can obtain this
+## line by using the R function optim().
+## This is just a preliminary step to plot again the original datapoints 
+# (in order to visualize what optim does)
+plot(Lung_Cancer~Smoker, data=chsi)
+## optim searches for the parameters that minimise a given function. 
+## As a first argument the starting values for those parameters have to be provided
+## and as a second argument the name of the function that should be minimized
+optimalSSQ <- optim(c(0, 0), getSSQ )
+## The output produced by optim is a list containing (amongst others) the optimal 
+# parameter values given by:
+optimalSSQ$par # [1] 23.761359  1.477318 , anstelle c(0, 0), genau wie oben bei 
+# summary für intersept und slope
+## and the minimum of the function getSSQ reached at those values given by:
+optimalSSQ$value # [1] 294385.1 , genau so wie oben (getSSQ())
+
+## Task: Verify that our manual approach with optim and lm() yield the same straight line 
+## as the best fit of the data. Ja, vergleiche unsere Funktionen für die Herausgabe 
+# von Intersept und slope, 
+## und die Funktion für getSSQ. 
+
+# ## Task: Fit instead of a straight line an alternative function to the data; 
+# e.g. a quadratic curve.
+# getSSQ_quadratic <- function(parm) {
+#   # Extract parameters
+#   intercept <- parm[1]
+#   linear <- parm[2]
+#   quadratic <- parm[3]
+#   # Predicted values based on quadratic function
+#   yPredicted <- intercept + linear * chsi$Smoker + quadratic * chsi$Smoker^2
+#   # Plot predicted line (for visualization)
+#   lines(chsi$Smoker, yPredicted, col=hsv(runif(1)), lwd=0.25)
+#   # Calculate SSQ
+#   squaredDifference <- (yPredicted - chsi$Lung_Cancer)^2
+#   ssq <- sum(squaredDifference, na.rm = TRUE)
+#   return(ssq)
+# }
+# # Startwerte für die Parameter (intercept, linear, quadratic)
+# start_values <- c(0, 0, 0)
+# # Optimierung mit quadratischer SSQ-Funktion
+# optimalSSQ_quadratic <- optim(start_values, getSSQ_quadratic)
+# # Ergebnisse der Optimierung
+# optimal_params <- optimalSSQ_quadratic$par
+# # Quadratisches Modell mit lm()
+# quadratic_model <- lm(Lung_Cancer ~ Smoker + I(Smoker^2), data = chsi)
+# # Extrahiere die Koeffizienten
+# lm_params <- coef(quadratic_model)
+# # Plot der Originaldaten
+# plot(Lung_Cancer ~ Smoker, data = chsi, main = "Quadratische Anpassung", 
+#      xlab = "Smoker", ylab = "Lung Cancer")
+# # Linie von optim()
+# curve(optimal_params[1] + optimal_params[2] * x + optimal_params[3] * x^2, 
+#       add = TRUE, col = "red", lwd = 2)
+# # Linie von lm()
+# curve(lm_params[1] + lm_params[2] * x + lm_params[3] * x^2, 
+#       add = TRUE, col = "blue", lty = 2, lwd = 2)
+# legend("topleft", legend = c("optim()", "lm()"), col = c("red", "blue"), 
+#        lty = c(1, 2), lwd = 2)
+
+## 4.2 For-loops
+## A for-loop in R has the following structure
+for(COUNTER in VECTOR){
+  BODY
+}
+
+## which means that the COUNTER goes sequentially through each value in the VECTOR 
+# and every time the
+## code in the BODY is executed. For example
+for(k in 1:5){       # this goes through the numbers 1 to 5 and prints each of them
+  print(k)
+}
+
+## Loops can also be nested inside each other
+for(k in 1:5){
+  for(kk in 1:5){
+    print(c(k, kk))
+  }
+}
+
+## We can also combine for-loops with if/else statements:
+v6 <- c(-1, 2, -2, 4, 5, 6, -4)
+v6positive <- c() ; v6negative <- c() # andere Schreibweise nebeneinander
+for(k in v6) {      # if the statement inside the brackets () is TRUE,
+                    # then the code inside the curly brackers {} is exectuted
+  if(k >= 0) {
+    v6positive <- c(v6positive, k)
+  }
+  else{             # if the condition of previous if statment is false then the
+                    # the code after "else" is executed
+    v6negative <- c(v6negative, k)
+  }   # note: an if-statement does not have to be followed by an else statement
+}
+
+## TASK: Recode/rewrite the previous for-loop using logical indices
+# Originaler Vektor
+v6 <- c(-1, 2, -2, 4, 5, 6, -4)
+# Vektoren für positive und negative Werte, logical conditions sind: v6 >= 0 für 
+# Output FALSE TRUE FALSE TRUE TRUE TRUE FALSE
+v6positive <- v6[v6 >= 0]  # Wählt alle Elemente, die größer oder gleich 0 sind
+v6negative <- v6[v6 < 0]   # Wählt alle Elemente, die kleiner als 0 sind, 
+# logical conditions sind: v6 < 0 für Output TRUE FALSE TRUE FALSE FALSE FALSE TRUE
+# Ergebnisse ausgeben
+print(v6positive)  # [1] 2 4 5 6
+print(v6negative)  # [1] -1 -2 -4
+
+
+## Now we want to use these for-loops to systematically assess the association of 
+# potential exposures with the
+## incidence of health-related outcomes in the CHSI data. 
+# To do this check first the column-names of the chsi data set:
+colnames(chsi)
+# [1] "Col_Cancer"        "Lung_Cancer"       "Suicide"           "CHD"               "Brst_Cancer"      
+# [6] "Obesity"           "Smoker"            "Poverty"           "Few_Fruit_Veg"     "CHSI_State_Name.x"
+
+## you will see that columns 1 to 5 correspond to health-related outcomes and 
+# columns 6 to 9 to potential exposures.
+## We will create a matrix which contains for each combination of outcome and 
+# exposure the R-squared, i.e. how
+## much of the variance of the outcome (incidence) is explained by the exposure.
+
+## Zuerst erstellen wir eine Matrix, die mit NAs gefüllt ist
+R2matrix <- matrix(NA, nrow=5, ncol=4)  # 5 Zeilen und 4 Spalten, initial mit NA
+## Geben wir den Zeilen und Spalten aussagekräftige Namen
+rownames(R2matrix) <- colnames(chsi)[1:5]  # Outcome, die ersten 5 Spaltennamen 
+                                            # von chsi werden als Zeilennamen verwendet
+colnames(R2matrix) <- colnames(chsi)[6:9]  # Exposure, Spaltennamen 6 bis 9 von 
+                                            # chsi werden als Spaltennamen verwendet
+## Wir berechnen nun für jede Kombination von Exposition (j) und Ergebnis (k) den R2-Wert
+for(k in 1:5){  # Für jede der ersten 5 Spalten von chsi Outcome 
+                # (die als Zeilen in der Matrix repräsentiert werden)
+  for(j in 6:9){  # Für jede der Spalten 6 bis 9 von chsi Exposure 
+                  # (die als Spalten in der Matrix dargestellt werden)
+    # Erstelle ein lineares Modell (lm), wobei "k" die abhängige Variable und 
+                                            # "j" die unabhängige Variable ist
+    mo <- lm(paste((colnames(chsi)[k]), "~", (colnames(chsi)[j])), data=chsi)
+    # Speichere den R2-Wert des Modells in die Matrix
+    # Hinweis: Die Funktion "paste" erstellt die Formel als String, z.B. "Outcome ~ Exposure"
+    R2matrix[k, j-5] <- getR2(mo)  # j-5, da Spaltennamen in R2matrix bei 1 beginnen, 
+                                    # aber chsi bei 6
+  }
+}
+## Die Matrix R2matrix enthält jetzt die R2-Werte für jede Kombination von 
+                  # Outcome (Zeilen) und Exposure (Spalten)
+## Wir visualisieren die Matrix mit einem Heatmap-Plot
+heatmap(R2matrix, 
+        col = gray.colors(start=0.9, end=0.2, 256),  # Graustufen-Farbskala von 
+                                                      # hellgrau (0.9) bis dunkelgrau (0.2)
+        scale = "none",  # Keine Skalierung der Werte (Rohwerte werden verwendet)
+        Rowv = NA,  # Zeilen werden nicht neu geordnet
+        Colv = NA)  # Spalten werden nicht neu geordnet
+## Nach dem Ausführen des Codes enthält die Heatmap die berechneten R2-Werte für 
+                            # jede Kombination von Exposition und Ergebnis. 
+## Die Farbtöne vermitteln die Stärke des Zusammenhangs (höhere Werte = dunklere Grautöne).
+
+## TASK: Do the same to produce a matrix with the p values for each association. 
+                                              # Hint: Use log p values for
+                                        ## plotting to make the differences more visibile
+## Zuerst erstellen wir eine Matrix, die mit NAs gefüllt ist
+Pmatrix <- matrix(NA, nrow=5, ncol=4)  # 5 Zeilen (Outcomes) und 4 Spalten (Exposures), 
+                                        # initial mit NA
+## Geben wir den Zeilen und Spalten aussagekräftige Namen
+rownames(Pmatrix) <- colnames(chsi)[1:5]  # Outcome: die ersten 5 Spaltennamen von chsi
+colnames(Pmatrix) <- colnames(chsi)[6:9]  # Exposure: Spaltennamen 6 bis 9 von chsi
+## Wir berechnen nun für jede Kombination von Exposition (j) und Ergebnis (k) die p-Werte
+for(k in 1:5){  # Für jede der ersten 5 Spalten von chsi (Outcome)
+  for(j in 6:9){  # Für jede der Spalten 6 bis 9 von chsi (Exposure)
+    # Erstelle ein lineares Modell (lm), wobei "k" die abhängige Variable 
+    # und "j" die unabhängige Variable ist
+    mo <- lm(paste((colnames(chsi)[k]), "~", (colnames(chsi)[j])), data=chsi)
+    # Extrahiere den p-Wert für die unabhängige Variable (Exposure)
+    p_value <- summary(mo)$coefficients[2, 4]  # Der p-Wert steht in der 4. 
+    # Spalte der Koeffizienten-Tabelle
+    # Speichere den -log10(p-Wert) in die Matrix (falls der p-Wert existiert, sonst NA)
+    Pmatrix[k, j-5] <- ifelse(!is.na(p_value), -log10(p_value), NA)
+  }
+}
+## Die Matrix Pmatrix enthält jetzt die -log10(p-Werte) für jede Kombination von 
+# Outcome (Zeilen) und Exposure (Spalten)
+## Wir visualisieren die Matrix mit einem Heatmap-Plot
+heatmap(Pmatrix, 
+        col = gray.colors(start=0.9, end=0.2, 256),  # Graustufen-Farbskala von 
+                                                      # hellgrau (0.9) bis dunkelgrau (0.2)
+        scale = "none",  # Keine Skalierung der Werte (Rohwerte werden verwendet)
+        Rowv = NA,  # Zeilen werden nicht neu geordnet
+        Colv = NA,  # Spalten werden nicht neu geordnet
+        main = "-log10(p-Werte)")  # Titel des Plots
+## Nach dem Ausführen des Codes enthält die Heatmap die Werte log10(p), 
+## wobei stärkere Assoziationen durch dunklere Farben hervorgehoben werden.
+
+## TASK: We have now seen several significant statistical associations between 
+# outcomes and exposures. How
+## strong is the evidence for a causal role of those exposures? What are the 
+# caveats when interpreting the statistical
+## associations as evidence for a causal role? What could be done to address these issues?
+# Causal Role of Exposures – Interpretation and Caveats
+# Frage: Wie stark ist die Evidenz für eine kausale Rolle der Expositionen?
+#   Korrelation vs. Kausalität:
+#   Statistische Assoziationen zeigen nur, dass ein Zusammenhang zwischen Expositionen 
+# und Outcomes besteht.
+# Solche Zusammenhänge können jedoch durch Störfaktoren (Confounders) oder umgekehrte 
+# Kausalität beeinflusst sein.
+# Stärke der Evidenz für Kausalität:
+#   Die Evidenz ist nur stark, wenn plausible Mechanismen und unabhängige Studien 
+# ähnliche Ergebnisse zeigen.
+# Kriterien wie die Bradford-Hill-Kriterien können helfen, die Kausalität zu bewerten 
+# (z. B. Stärke, Konsistenz, Zeitlichkeit, biologische Plausibilität).
+# Frage: Was sind die Einschränkungen (Caveats) bei der Interpretation statistischer 
+# Assoziationen als kausale Evidenz?
+#   Confounding:
+#   Störfaktoren (z. B. Alter, Geschlecht) können sowohl mit der Exposition als auch 
+  #   dem Outcome assoziiert sein.
+# Beispiel: Rauchen könnte sowohl mit einer Exposition (z. B. Alkoholkonsum) als auch 
+# mit Lungenkrebs in Verbindung stehen.
+# Umgekehrte Kausalität:
+#   Das Outcome könnte die Exposition beeinflussen, nicht umgekehrt.
+# Beispiel: Eine Krankheit könnte das Verhalten (z. B. Diät) ändern.
+# Fehlende Daten und Verzerrungen:
+#   Unvollständige oder fehlerhafte Daten können zu falschen Schlussfolgerungen führen.
+# Multiple Tests:
+#   Wenn viele Tests durchgeführt werden, steigt die Wahrscheinlichkeit von Zufallsbefunden 
+# (False Positives).
+# Frage: Was könnte getan werden, um diese Probleme zu adressieren?
+#   Multivariate Analyse:
+#   Kontrollieren von Confoundern durch Regressionsmodelle (z. B. multiple lineare Regression, 
+# logistische Regression).
+# Studien-Design:
+#   Randomisierte kontrollierte Studien (RCTs): Beste Methode, um Kausalität zu testen.
+# Kohortenstudien: Zeitlicher Verlauf kann Kausalität unterstützen.
+# Sensitivitätsanalysen:
+#   Überprüfen, ob die Ergebnisse robust gegenüber Änderungen in der Modellierung oder 
+# Variablenauswahl sind.
+# Zusammenführung mehrerer Evidenzquellen:
+#   Meta-Analysen und systematische Reviews können Ergebnisse aus verschiedenen Studien 
+# zusammenfassen.
+ 
+## TASK: If you have come this far within one day, you are sufficiently advanced 
+# to think on your own about how
+## to appropriately analyse the esophageal cancer. Discuss this with your partner 
+# and Teaching-Assistants and
+## quantify the association between esophageal cancer and the potential exposures. 
+# (Hint: Logistic regression).
+## Alternatively if you have had enough of statistics today, you can consider 
+# the next section.
+# Für diese Aufgabe verwenden wir logistische Regression, da es sich um ein binäres 
+# Outcome handelt 
+# (z. B. Vorhandensein oder Nichtvorhandensein von Speiseröhrenkrebs).
+# Schritte zur Analyse:
+# Identifikation potenzieller Expositionen (z. B. Rauchen, Alkoholkonsum, Alter, Geschlecht).
+# Aufbau eines logistischen Regressionsmodells, um die Assoziation zwischen Speiseröhrenkrebs 
+# und den Expositionen zu quantifizieren.
+# Interpretation der Odds Ratios (OR) aus dem Modell, um das relative Risiko zu bewerten.
+# R-Code für die logistische Regression:
+# Datensatz heißt esophCourse, mit einer binären Variable esophBn (Speiseröhrenkrebs: 
+# 1 = Ja, 0 = Nein) 
+# und potenziellen Expositionen (tobgp, alcgp, agegp):
+# Logistisches Regressionsmodell
+logistic_model <- glm(esophBn ~ tobgp + alcgp + agegp, data = esophCourse, family = binomial)
+# Zusammenfassung des Modells
+summary(logistic_model)
+# Berechnung der Odds Ratios (OR) und ihrer Konfidenzintervalle
+# Call:
+#   glm(formula = esophBn ~ tobgp + alcgp + agegp, family = binomial, 
+#       data = esophCourse)
+# 
+# Coefficients:
+#   Estimate Std. Error z value Pr(>|z|)    
+# (Intercept)  -5.9108     1.0302  -5.738 9.59e-09 ***
+#   tobgp10-19    0.3407     0.2054   1.659 0.097159 .  
+# tobgp20-29    0.3962     0.2456   1.613 0.106708    
+# tobgp30+      0.8677     0.2765   3.138 0.001701 ** 
+#   alcgp120+     2.1154     0.2876   7.356 1.90e-13 ***
+#   alcgp40-79    1.1216     0.2384   4.704 2.55e-06 ***
+#   alcgp80-119   1.4471     0.2628   5.506 3.68e-08 ***
+#   agegp35-44    1.6095     1.0675   1.508 0.131631    
+# agegp45-54    2.9752     1.0242   2.905 0.003673 ** 
+#   agegp55-64    3.3584     1.0198   3.293 0.000991 ***
+#   agegp65-74    3.7270     1.0252   3.635 0.000278 ***
+#   agegp75+      3.6818     1.0644   3.459 0.000542 ***
+#   ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# (Dispersion parameter for binomial family taken to be 1)
+# 
+# Null deviance: 1072.13  on 1174  degrees of freedom
+# Residual deviance:  898.86  on 1163  degrees of freedom
+# AIC: 922.86
+
+# Number of Fisher Scoring iterations: 7
+exp_coef <- exp(coef(logistic_model))  # Odds Ratios
+confint <- exp(confint(logistic_model))  # Konfidenzintervalle
+# Ausgabe der Ergebnisse
+cat("Odds Ratios:\n")
+# print(exp_coef)
+# (Intercept)   tobgp10-19   tobgp20-29     tobgp30+    alcgp120+   alcgp40-79  alcgp80-119   agegp35-44   agegp45-54 
+# 0.002710046  1.405982889  1.486221090  2.381435327  8.292938857  3.069638047  4.250811157  5.000426419 19.592860601 
+# agegp55-64   agegp65-74     agegp75+ 
+#   28.741838714 41.554820473 39.716131696 
+cat("\nKonfidenzintervalle:\n")
+print(confint)
+# 2.5 %       97.5 %
+#   (Intercept) 0.0001500675   0.01309908
+# tobgp10-19  0.9376683713   2.10030180
+# tobgp20-29  0.9107730044   2.39108827
+# tobgp30+    1.3753149495   4.07656452
+# alcgp120+   4.7505293149  14.70778864
+# alcgp40-79  1.9438541680   4.96418586
+# alcgp80-119 2.5569142186   7.18622034
+# agegp35-44  0.9048631279  93.44878223
+# agegp45-54  4.1082387507 351.60522806
+# agegp55-64  6.1156375260 513.64350950
+# agegp65-74  8.6954398437 746.54212990
+# agegp75+    7.3282702887 740.73843920
+# Interpretation der Ergebnisse:
+# Odds Ratios (OR) ist das relative Risiko:
+# OR > 1: Höheres Risiko (positive Assoziation).
+# OR < 1: Geringeres Risiko (negative Assoziation).
+# Beispiel: Ein OR von 2 für Rauchen bedeutet, dass Raucher doppelt so wahrscheinlich S
+# peiseröhrenkrebs entwickeln wie Nichtraucher.
+# Konfidenzintervalle:
+# Wenn das 95%-Konfidenzintervall 1 einschließt, ist die Assoziation statistisch 
+# nicht signifikant.
+# Visualisierung:
+# Zur Darstellung der Ergebnisse kannst du die geschätzten Odds Ratios und Konfidenzintervalle 
+# in einem Forest-Plot visualisieren:
+# Installiere ggplot2, falls noch nicht installiert
+if (!require(ggplot2)) install.packages("ggplot2")
+# Daten für den Plot erstellen
+results <- data.frame(
+  Variable = names(exp_coef),
+  OR = exp_coef,
+  Lower = confint[, 1],
+  Upper = confint[, 2]
+)
+# Forest-Plot
+ggplot(results, aes(x = Variable, y = OR)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  scale_y_log10() +  # Log-Skalierung der y-Achse
+  labs(title = "Odds Ratios und 95%-Konfidenzintervalle",
+       x = "Variable", y = "Odds Ratio") +
+  theme_minimal()
+
+
+## 5 Population Dynamics
+## As a final application of for-loops and functions we will consider simulating the 
+# dynamics of biological populations.
+## Here we consider a classical population-dynamics model, the logistic map. 
+# Consider the population
+## size of an animal species with discrete generations (e.g. a seasonal breeder): 
+# at low population densities, the
+## population size in generation t+1 will be a multiple of the population at generation t. 
+# However at high population
+## densities, the population in generation t will use up so many resources that it 
+# jeopardizes its reproductive
+## success, thereby reducing the population growth or even the population size in 
+# generation t+1. Such a behavior
+## is called negative-density dependent growth and can be captured by the updating rule
+##            x(t + 1) = r ∗ x(t) ∗ (1 − x(t))
+## called the logistic map.
+## The following function simulates, starting from a specified initial population size, 
+# the dynamics of a population
+## growing according to the above rule.
+
+## As input we provide the intial population density (xInitial)
+## the growth Rate, the number of generations that the population is simulated
+## and optionally the length of the burn-in phase
+## (i.e. the length of the initial phase which is discarded for the final ouput)
+logisticMapDynamics <- function(xInitial, growthRate, nGenerations, nBurnIn){
+  dynamics <- rep(NA, nGenerations)
+  dynamics[1] <- xInitial
+  for(k in 1:(nGenerations-1)){
+    dynamics[k+1] <- growthRate*dynamics[k]*(1-dynamics[k])
+  }
+  dynamics[nBurnIn:nGenerations]
+}
+## here we plot the dynamics for one choice of growth rate
+plot(logisticMapDynamics(0.01, 1.5, 100, 10), type="l", ylim=c(0, 1))
+## here we add the dynamics of another growth rate
+lines(logisticMapDynamics(0.01, 2.5, 100, 10), col=3)
+
+## TASK: Discuss with your partner what the function logisticMapDynamics does?
+# Discuss what the function logisticMapDynamics does.
+# Explanation:
+# Inputs:
+# xInitial: Initial population density x0
+# growthRate: Growth rate r
+# nGenerations: Total number of generations to simulate.
+# nBurnIn: Number of initial generations to discard (burn-in phase).
+# Mechanism:
+# Simulates population dynamics using the logistic map equation:
+#             x(t+1)=r⋅x(t)⋅(1−x(t))
+# Iterates the population dynamics over nGenerations generations, storing the 
+# population size in dynamics.
+# Returns the population dynamics after the burn-in phase.
+# Output:
+# A vector of population sizes for the specified range of generations, excluding 
+# the burn-in phase.
+# Die Funktion logisticMapDynamics simuliert die Dynamik einer Population, die nach dem 
+# logistischen Modell wächst.
+# Inputs:
+# xInitial: Die anfängliche Populationsdichte.
+# growthRate: Die Wachstumsrate (r).
+# nGenerations: Die Anzahl der Generationen, die simuliert werden.
+# nBurnIn: Die Länge der sogenannten Burn-In-Phase, also die Anzahl der Generationen, 
+# die zu Beginn ignoriert werden.
+# Mechanismus:
+# Die Funktion berechnet die Populationsgröße in jeder Generation mithilfe der Formel:
+# x(t+1)=r⋅x(t)⋅(1−x(t))
+# Diese Formel beschreibt, wie die Wachstumsrate, die aktuelle Populationsgröße, 
+# und der Ressourcenverbrauch das Wachstum beeinflussen.
+# Output:
+# Ein Vektor mit den Populationsdichten für jede Generation, 
+# wobei die Werte der Burn-In-Phase ausgelassen werden.
+
+## TASK: Plot the dynamics for a range of growth-rates between 1 and 4 and discuss 
+## the different qualitative behaviors of the system?
+# Define growth rates to explore
+growth_rates <- seq(1, 4, by = 0.1)
+# Plot dynamics for each growth rate
+par(mfrow = c(2, 2))  # Arrange plots in a grid
+for(r in growth_rates) {
+  plot(logisticMapDynamics(0.01, r, 100, 10), type = "l", ylim = c(0, 1), 
+       main = paste("Growth Rate =", r), xlab = "Generation", ylab = "Population Density")
+}
+# Discussion:
+# For growth rates close to 1:
+# Population stabilizes at a low density.
+# As growth rates increase (1.5 to 3):
+# Population exhibits periodic behavior (oscillates between two or more densities).
+# For growth rates > 3:
+# Dynamics become chaotic, showing highly irregular fluctuations.
+# Beobachtungen:
+# Wachstumsrate nahe 1:
+# Die Population stabilisiert sich bei einer niedrigen Dichte, da die Wachstumsrate gering ist.
+# Wachstumsrate zwischen 1,5 und 3:
+# Die Population beginnt zu oszillieren, wobei sich die Populationsdichten regelmäßig zwischen 
+# zwei oder mehr Werten abwechseln.
+# Wachstumsrate über 3:
+# Die Dynamik wird chaotisch: Die Population schwankt unregelmäßig, ohne ein klares Muster. 
+# Dies ist ein Zeichen für nicht-lineares Verhalten und komplexe Dynamiken.
+# Schlussfolgerungen:
+# Die logistische Gleichung zeigt, dass bereits einfache Modelle chaotisches Verhalten erzeugen können.
+# Das Verhalten des Systems ändert sich qualitativ mit der Wachstumsrate, von Stabilität 
+# über Periodizität bis hin zu Chaos.
+
+## To obtain an overview of the dynamic behavior of the system over an entire range of parameters, 
+## we can use the following approach:
+res <- c()
+for(r in seq(1.3, 3.9, by=0.005)){
+  res <- cbind(res, rbind(r, logisticMapDynamics(0.01, r, 500, 100)))
+}
+plot(res[1, ], res[2, ], pch=".")
+
+## TASK: Discuss with your partner what the above for-loop does and interpret the plot 
+## that is generated (this type of plot is called a bifurcation diagram. why?). 
+## Discuss what this pattern means for our understanding of complexity in biology.
+# Generate the bifurcation diagram
+res <- c()
+for(r in seq(1.3, 3.9, by = 0.005)) {
+  res <- cbind(res, rbind(r, logisticMapDynamics(0.01, r, 500, 100)))
+}
+plot(res[1, ], res[2, ], pch = ".", xlab = "Growth Rate (r)", ylab = "Population Density",
+     main = "Bifurcation Diagram")
+# Discussion:
+# What the loop does:
+# Iterates over growth rates r from 1.3 to 3.9 in steps of 0.005.
+# For each r, calculates the population dynamics over 500 generations, 
+# discarding the first 100 generations (burn-in phase).
+# Appends the growth rate r and the final population densities to res.
+# Plot Interpretation:
+# The bifurcation diagram shows how population density depends on r.
+# For small r, the population stabilizes at a single value (fixed point).
+# At higher r, the population oscillates between multiple densities (periodic behavior).
+# Beyond a critical r (~3.5), the system becomes chaotic, showing dense, irregular patterns.
+# Why it’s called a bifurcation diagram: 
+# As r increases, the system transitions from stability to periodicity and chaos, 
+# splitting into multiple branches (bifurcations).
+# Was macht die Schleife?
+# Für Wachstumsraten (r) von 1,3 bis 3,9 wird die Populationsdynamik über 500 Generationen 
+# berechnet.
+# Die ersten 100 Generationen (Burn-In) werden ausgelassen.
+# Die Populationsdichten nach der Burn-In-Phase werden zusammen mit der entsprechenden 
+# Wachstumsrate in einem Diagramm geplottet.
+# Interpretation des Bifurkationsdiagramms:
+# Wachstumsrate < 3:
+# Die Population konvergiert zu einem festen Wert (stabile Populationsgröße).
+# Bei höheren r teilt sich die Population in zwei (oder mehr) Werte auf, 
+# die abwechselnd erreicht werden (periodisches Verhalten).
+# Wachstumsrate > 3,5:
+# Das System wird chaotisch: Die Population zeigt keine klaren Muster mehr, 
+# sondern schwankt unregelmäßig.
+# Warum "Bifurkationsdiagramm"?
+# Das Diagramm zeigt, wie sich die Dynamik des Systems mit der Wachstumsrate verändert.
+# Es entstehen "Gabelungen" (Bifurkationen), wenn das System von Stabilität zu 
+# Periodizität übergeht und schließlich in Chaos endet.
+# Bedeutung für die Biologie:
+# Das Diagramm verdeutlicht, wie komplex biologisches Verhalten sein kann, selbst bei 
+# einfachen Wachstumsmodellen.
+# Es zeigt, dass kleine Änderungen in Parametern (z. B. r) drastische Auswirkungen 
+# auf die Dynamik haben können.
+
+## An alternative to the logistic map (that follows a similar biological intuition 
+## of negative density dependent growth but has some mathematical advantages) is given by:
+##         x(t + 1) = x(t) ∗ exp(r ∗ (1 − x(t)))
+
+## TASK: Repeat the above analysis (exploring dynamics, bifurcation diagram) 
+## for this version of negative density dependent growth.
+# function definition:
+alternativeDynamics <- function(xInitial, growthRate, nGenerations, nBurnIn) {
+  dynamics <- rep(NA, nGenerations)
+  dynamics[1] <- xInitial
+  for(k in 1:(nGenerations - 1)) {
+    dynamics[k + 1] <- dynamics[k] * exp(growthRate * (1 - dynamics[k]))
+  }
+  dynamics[nBurnIn:nGenerations]
+}
+# exploring dynamics:
+# Plot dynamics for a range of growth rates
+par(mfrow = c(2, 2))
+growth_rates <- seq(1, 4, by = 0.1)
+for(r in growth_rates) {
+  plot(alternativeDynamics(0.01, r, 100, 10), type = "l", ylim = c(0, 2), 
+       main = paste("Growth Rate =", r), xlab = "Generation", ylab = "Population Density")
+}
+# generating the bifurcatio diagramm:
+# Generate bifurcation diagram for the alternative model
+res_alt <- c()
+for(r in seq(1.3, 3.9, by = 0.005)) {
+  res_alt <- cbind(res_alt, rbind(r, alternativeDynamics(0.01, r, 500, 100)))
+}
+plot(res_alt[1, ], res_alt[2, ], pch = ".", xlab = "Growth Rate (r)", ylab = "Population Density",
+     main = "Bifurcation Diagram (Alternative Model)")
+# Discussion of Results:
+# Similar trends are observed as in the logistic map, but the transition to chaos may occur 
+# at slightly different growth rates due to the exponential term.
+# The bifurcation diagram highlights how small changes in r can lead to complex 
+# population dynamics, 
+# underscoring the non-linear nature of biological systems.
+# Unterschiede zum logistischen Modell:
+# Das alternative Modell verwendet eine exponentielle Funktion, was einige mathematische 
+# Vorteile bietet.
+# Der Ressourcenverbrauch wird hier ebenfalls berücksichtigt, jedoch in einer anderen 
+# mathematischen Form.
+# Beobachtungen der Dynamiken:
+# Die Dynamiken sind qualitativ ähnlich zum logistischen Modell:
+# Bei niedrigen r: Stabile Population.
+# Bei mittleren r: Periodisches Verhalten.
+# Bei hohen r: Chaotische Dynamiken.
+# Die Übergänge zwischen Stabilität, Periodizität und Chaos treten bei leicht anderen 
+# Wachstumsraten auf.
+# Bifurkationsdiagramm:
+# Das Diagramm zeigt ähnliche Muster wie das des logistischen Modells, mit Bifurkationen 
+# und einem Übergang in Chaos.
+# Es verdeutlicht, dass komplexe Dynamiken nicht nur vom logistischen Modell abhängen, 
+# sondern auch in anderen Modellen mit negativen dichteabhängigen Wachstumsraten auftreten.
+# Bedeutung:
+# Das alternative Modell bestätigt, dass negative dichteabhängige Wachstumsprozesse 
+# chaotische Dynamiken erzeugen können.
+# Solche nicht-linearen Dynamiken sind typisch für ökologische Systeme und illustrieren 
+# die inhärente Komplexität biologischer Prozesse.
+
+
+######################################################################
+### Problem 1 Waiting queue for einfach gut menu in Mensa UZH Irchel
+###### als Beispiel für eine Simulation ##############################
+######################################################################
+
+# Pakete installieren und laden
+install.packages("GillespieSSA")
+install.packages("kaiser14pb", repos=NULL, type="source")
+require(GillespieSSA)
+require(kaiser14pb)
+
+### Aufgabe 1: Unfaire Münze ###
+# (a) Wahrscheinlichkeit von "Kopf" schätzen
+prob_head <- 80 / 100  # 80 von 100 Würfen sind "Kopf"
+print(prob_head)  # Ergebnis: 0.8
+
+# (b) Simulation von 104 Münzwürfen mit der geschätzten Wahrscheinlichkeit
+coin_sample <- sample(c("Head", "Tail"),
+                      size = 104,
+                      replace = TRUE,
+                      prob = c(prob_head, 1 - prob_head))
+result_table <- table(coin_sample)
+print(result_table)  # Ausgabe der simulierten Ergebnisse
+
+### Aufgabe 2: Konstante Ereignisraten ###
+# (a) Wahrscheinlichkeiten der Ereignisse R, C und M
+rate_R <- 1
+rate_C <- 2
+rate_M <- 7
+rate_total <- rate_R + rate_C + rate_M
+prob_R <- rate_R / rate_total
+prob_C <- rate_C / rate_total
+prob_M <- rate_M / rate_total
+print(c(prob_R, prob_C, prob_M))  # Ergebnis: Wahrscheinlichkeiten für R, C und M
+
+# # (b) Simulation von 50 Ereignissen und Berechnung der Warteschlangenlänge
+# set.seed(42)  # Für reproduzierbare Ergebnisse
+# dqueue <- c("R" = 1, "C" = -1, "M" = 1)
+# events_sample <- sample(c("R", "C", "M"),
+#                         size = 50,
+#                         replace = TRUE,
+#                         prob = c(prob_R, prob_C, prob_M))
+# L_changes <- as.integer(dqueue[events_sample])
+# L_50 <- sum(L_changes) + 25  # Initiale Warteschlangenlänge von 25
+# print(L_50)  # Ergebnis: Länge der Warteschlange nach 50 Ereignissen
+
+# (c) Wiederholung der Simulation 1000-mal
+L_50_sample <- replicate(1000, {
+  events_sample <- sample(c("R", "C", "M"),
+                          size = 50,
+                          replace = TRUE,
+                          prob = c(prob_R, prob_C, prob_M))
+  L_changes <- as.integer(dqueue[events_sample])
+  sum(L_changes) + 25
+})
+prob_shorter <- mean(L_50_sample < 25)
+print(prob_shorter)  # Ergebnis: Wahrscheinlichkeit, dass Warteschlange kürzer als 25 ist
+
+### Aufgabe 3: Warteschlangenlänge abhängig von Raten ###
+# (a) Simulation der Warteschlange für 50 Ereignisse
+queue_first <- function(L_0, rate_R, rate_C, rate_M, N_events) {
+  cur_L <- L_0
+  for (i in 1:N_events) {
+    rate_total <- rate_R * cur_L + rate_C * cur_L + rate_M
+    prob_R <- (rate_R * cur_L) / rate_total
+    prob_C <- (rate_C * cur_L) / rate_total
+    prob_M <- rate_M / rate_total
+    event <- sample(c("R", "C", "M"), size = 1, replace = TRUE, prob = c(prob_R, prob_C, prob_M))
+    cur_L <- cur_L + dqueue[event]
+  }
+  return(cur_L)
+}
+L_50 <- queue_first(L_0 = 25, rate_R = 1, rate_C = 2, rate_M = 7, N_events = 50)
+print(L_50)  # Ergebnis: Warteschlangenlänge nach 50 Ereignissen
+
+# (b) Wiederholung der Simulation 1000-mal
+queue_lengths <- replicate(1000, queue_first(L_0 = 25, rate_R = 1, rate_C = 2, rate_M = 7, N_events = 50))
+prob_shorter <- mean(queue_lengths < 25)
+print(prob_shorter)  # Ergebnis: Wahrscheinlichkeit für kürzere Warteschlange
+
+### Aufgabe 4: Simulation mit zufälligen Zeitabständen ###
+Gillespie_MRC <- function(L_0, rate_M, rate_R, rate_C, T_final) {
+  queue <- data.frame("time" = 0, "L" = L_0)
+  cur_L <- L_0
+  cur_t <- 0
+  while (cur_t < T_final) {
+    rate_total <- rate_R * cur_L + rate_C * cur_L + rate_M
+    prob_R <- (rate_R * cur_L) / rate_total
+    prob_C <- (rate_C * cur_L) / rate_total
+    prob_M <- rate_M / rate_total
+    tau <- rexp(1, rate = rate_total)
+    cur_t <- cur_t + tau
+    event <- sample(c("R", "C", "M"), size = 1, replace = TRUE, prob = c(prob_R, prob_C, prob_M))
+    cur_L <- cur_L + dqueue[event]
+    queue <- rbind(queue, c("time" = cur_t, "L" = cur_L))
+  }
+  return(queue)
+}
+
+queue_sim <- Gillespie_MRC(L_0 = 25, rate_M = 7, rate_R = 1, rate_C = 2, T_final = 5)
+plot(queue_sim$time, queue_sim$L, type = "s", xlab = "Zeit [min]", ylab = "Warteschlangenlänge", main = "Warteschlangenlänge zwischen 12:00 und 12:05")
+
+queue_lengths_at_12.05 <- replicate(1000, {
+  sim <- Gillespie_MRC(L_0 = 25, rate_M = 7, rate_R = 1, rate_C = 2, T_final = 5)
+  if (tail(sim$time, 1) >= 5) {
+    tail(sim$L, 1)
+  } else {
+    NA
+  }
+})
+prob_shorter_at_12.05 <- mean(queue_lengths_at_12.05 < 25, na.rm = TRUE)
+print(prob_shorter_at_12.05)  # Ergebnis: Wahrscheinlichkeit für kürzere Warteschlange um 12:05
+
+
+```
+

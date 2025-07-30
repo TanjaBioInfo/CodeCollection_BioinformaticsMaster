@@ -1,0 +1,2555 @@
+---
+title: "Templates for exam"
+author: "TR"
+date: "`r Sys.Date()`"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+------------- EDA, Step by Step -------------------
+Daten laden und Überblick verschaffen
+```{r}
+library(faraway)        # Paket mit dem Datensatz 'happy'
+data <- happy           # Datensatz speichern
+# Erster Eindruck – die ersten zwei Zeilen anzeigen
+head(data, n = 2)
+```
+
+Datentypen analysieren
+```{r}
+# Welche Datentypen (numerisch, faktor, etc.) liegen vor?
+str(data)
+```
+Hinweis zur Interpretation:
+- Auch wenn alle Variablen als `numeric` codiert sind, können sie konzeptionell nominal oder ordinal sein.
+- Beispiel: `love` (Werte 1–3) ist ordinal, nicht metrisch.
+
+| Variable | Bedeutung                    | Typ (in R) | Interpretation           |
+|----------|------------------------------|------------|---------------------------|
+| happy    | Zufriedenheit (1–10)         | numeric    | ordinal (behandelt als metrisch) |
+| money    | Einkommen in 1000 \$         | numeric    | metrisch (quantitativ)   |
+| sex      | 0 = nein, 1 = ja             | numeric    | nominal (binär)          |
+| love     | 1 = einsam, 2 = Beziehung, 3 = Zugehörigkeit | numeric | ordinal |
+| work     | 1–5, Jobzufriedenheit        | numeric    | ordinal                  |
+
+Kategorische Variablen factorisieren
+```{r}
+Fdata <- data
+Fdata$sex   <- factor(Fdata$sex)
+Fdata$love  <- factor(Fdata$love)
+Fdata$work  <- factor(Fdata$work)
+str(Fdata)        # Kontrolle
+```
+`sex`, `love`, `work` sind kategorial. Durch `factor()` erzeugt R Dummy‑Variablen, damit die Koeffizienten als Unterschiede zur Referenzkategorie interpretiert werden können.
+
+Statistische Zusammenfassungen
+```{r}
+summary(data)
+summary(Fdata)
+```
+
+Marginale Muster analysieren
+```{r}
+# Histogramm für 'happy'
+hist(data$happy, col = "skyblue", main = "Verteilung der Variable 'happy'", xlab = "happy")
+hist(Fdata$happy, col = "skyblue", main = "Verteilung der Variable 'happy'", xlab = "happy")
+
+# Absolute Häufigkeiten anzeigen
+table(data$happy)
+table(Fdata$happy)
+
+# Boxplot für 'money'
+boxplot(data$money, main = "Boxplot für Einkommen", ylab = "Einkommen in 1000$")
+boxplot(Fdata$money, main = "Boxplot für Einkommen", ylab = "Einkommen in 1000$")
+```
+
+Paarweise Beziehungen (mit `pairs()`)
+```{r}
+# Visualisierung aller Variablenpaare
+pairs(data, lower.panel = NULL, pch = 19, cex = 0.7)
+pairs(Fdata, lower.panel = NULL, pch = 19, cex = 0.7)
+```
+Beachte bei der Interpretation:
+- Korrelationen oder visuelle Tendenzen (z. B. steigt 'happy' mit 'love'?)
+- Hinweise auf lineare Zusammenhänge für spätere Regressionsmodelle
+Was musst du immer angeben?
+1. Welche Datentypen liegen vor? → Nominal, Ordinal, Quantitativ
+2. Was fällt bei den Verteilungen (marginalen Mustern) auf?
+3. Gibt es visuelle Hinweise auf Zusammenhänge?
+
+Lineares Modell schätzen
+```{r}
+fit_full <- lm(happy ~ money + sex + love + work, data = data)
+fit_fullF <- lm(happy ~ money + sex + love + work, data = Fdata)
+summary(fit_full)
+summary(fit_fullF)
+```
+
+Annahme‑Checks
+Scale‑Location‑Plot – Varianzhomogenität
+```{r}
+plot(fit_full, which = 3)   # √|standardized residuals| vs fitted
+plot(fit_fullF, which = 3)   # √|standardized residuals| vs fitted
+```
+
+Residuen vs Fitted & Q‑Q‑Plot
+```{r}
+par(mfrow = c(2, 2))
+plot(fit_full)
+par(mfrow = c(2, 2))
+plot(fit_fullF)
+
+# par(mfrow = c(1, 2))
+# plot(fit_full, which = c(1, 2))
+# par(mfrow = c(1, 2))
+# plot(fit_fullF, which = c(1, 2))
+```
+
+Multikollinearität (VIF)
+```{r}
+library(car)       # für vif()
+vif(fit_full)
+vif(fit_fullF)
+```
+Faustregel: VIF < 5 ⇢ keine ernste Kollinearität.
+
+Modell­auswahl per AIC
+```{r}
+fit_aic <- step(fit_full, trace = FALSE)   # schrittweise AIC-Minimierung
+summary(fit_aic)
+Ffit_aic <- step(fit_fullF, trace = FALSE)   # schrittweise AIC-Minimierung
+summary(Ffit_aic)
+```
+Variablen mit geringem Nutzen werden entfernt (hier `sex`).  
+AIC ↓ ⇒ kleineres Modell bevorzugt.
+
+Vorhersagebeispiel, hier nur mit den faktorisierten Daten
+```{r}
+newdatatolm <- data.frame(money = 200,
+                        sex   = factor(0, levels = levels(Fdata$sex)),
+                        love  = factor(2, levels = levels(Fdata$love)),
+                        work  = factor(5, levels = levels(Fdata$work)))
+predict(Ffit_aic, newdata = newdatatolm)
+```
+
+95 %-Konfidenzintervall für den Intercept
+Manuell:
+```{r}
+b0      <- coef(summary(Ffit_aic))[1, 1]          # Schätzer
+se_b0   <- coef(summary(Ffit_aic))[1, 2]          # Standardfehler
+df      <- Ffit_aic$df.residual                  # Freiheitsgrade: n – (p*+1)
+t975    <- qt(0.975, df = df)
+CI_b0   <- b0 + c(-1, 1) * t975 * se_b0
+CI_b0
+```
+
+CI-Komfortfunktion:
+```{r}
+confint(Ffit_aic, level = 0.95)["(Intercept)", ]
+```
+Interpretation: Mit 95 % Sicherheit liegt der wahre Intercept (Basis‑`happy`) zwischen den Intervallgrenzen.
+
+Wichtig für die Prüfung
+1. factor() für kategoriale Variablen  
+2. lm() schätzen & summary interpretieren  
+3. Annahme‑Plots (Varianz, Normalität, Linearity)  
+4. VIF zur Kollinearität  
+5. step(AIC) für Modellreduktion  
+6. predict() für Punktvorhersagen  
+7. confint() oder manuelle Formel für KIs
+
+------------- random variables -------------------
+----------- diskreter Erwartungswert
+```{r}
+# Mögliche Werte eines Würfels und deren Wahrscheinlichkeit
+werte <- 1:6
+wahrscheinlichkeiten <- rep(1/6, 6)
+erwartungswert <- sum(werte * wahrscheinlichkeiten)
+erwartungswert  # Sollte 3.5 ergeben
+```
+
+kontinuierlicher Erwartungswert
+```{r, echo=FALSE}
+# Definition einer stückweisen Dichtefunktion
+f <- function(x) {
+  ifelse(x >= 0 & x <= 1, x,
+         ifelse(x > 1 & x <= 2, 2 - x, 0))
+}
+
+# Numerische Berechnung des Erwartungswerts
+expected_value <- integrate(function(x) x * f(x), lower = 0, upper = 2)$value
+expected_value  # Erwartungswert = 1
+```
+
+Boxplots
+```{r}
+HbSS <- c(7.2, 7.7, 8, 8.1, 8.3, 8.4, 8.4, 8.5, 8.6, 8.7, 9.1, 9.1, 9.1, 9.8, 10.1, 10.3)
+HbSb <- c(8.1, 9.2, 10, 10.4, 10.6, 10.9, 11.1, 11.9, 12, 12.1)
+boxplot(HbSS, HbSb, names = c("HbSS", "HbSβ"),
+        main = "Boxplots der Hämoglobinspiegel",
+        ylab = "Hämoglobin (g/dl)", col = c("lightblue", "lightgreen"))
+```
+
+----------------- functions of random variables ----------
+pmf und cdf von Verteilungen mit diskreten Variablen (binomial, Poisson, geometrisch)
+```{r}
+## binomial
+# Erzeugen eines Zahlenvektors
+x <- seq(1, 20, length.out = 1000)
+# Berechnung der binonialen Wahrscheinlichkeits-Massenfunktion (PMF)
+pmf <- dbinom(x, size = 10, prob = 0.6) # f(x) -> P(X=x)
+# Berechnung der binomialen kumulativen Verteilungsfunktion (CDF)
+cdf <- pbinom(x, size = 10, prob = 0.6) # F(x)
+par(mfrow = c(1,2))
+plot(x, pmf, type = "h", main = "PMF (Binomial)", xlab = "x", ylab = "p(x)")
+plot(x, cdf, type = "S", main = "CDF (Binomial)", xlab = "x", ylab = "F(x)")
+
+## Poisson
+# Berechnung der Poisson Wahrscheinlichkeits-Massenfunktion (PMF)
+x <- seq(0, 20, length.out = 1000)
+pmf <- dpois(x, lambda = 0.6) # f(x) -> P(X=x)
+# Berechnung der Poisson kumulativen Verteilungsfunktion (CDF)
+# n = Wert für P(x)
+cdf <- ppois(x, lambda = 0.6) # F(x)
+par(mfrow = c(1,2))
+plot(x, pmf, type = "h", main = "PMF (Poisson)", xlab = "x", ylab = "p(x)")
+plot(x, cdf, type = "S", main = "CDF (Poisson)", xlab = "x", ylab = "F(x)")
+
+## geometrisch
+# Berechnung der geometrischen Wahrscheinlichkeits-Massenfunktion (PMF)
+n <- 10
+pmf <- dgeom(n, prob = 0.6) # f(x) -> P(X=x)
+# Berechnung der geometrischen kumulativen Verteilungsfunktion (CDF)
+cdf <- pgeom(n, prob = 0.6) # F(x)
+```
+
+pdf und cdf von Verteilungen mit kontinuierlichen Variablen (uniform, normal, exponentiell)
+```{r}
+## uniform
+# Berechnung der uniformalen Wahrscheinlichkeits-Dichtefunktion (PDF)
+x <- seq(0, 20, length.out = 1000)
+pdf <- dunif(x, min = 5, max = 15) # f(x) Dichtefunktion = density function
+# Berechnung der uniformalen kumulativen Verteilungsfunktion (CDF)
+cdf <- punif(x, min = 5, max = 15) # F(x) Verteilungsfunktion = distribution function
+par(mfrow = c(1,2))
+plot(x, pdf, type = "l", main = "PDF (Uniform)", xlab = "x", ylab = "f(x)")
+plot(x, cdf, type = "l", main = "CDF (Uniform)", xlab = "x", ylab = "F(x)")
+
+## normal
+# Berechnung der normalen Wahrscheinlichkeits-Dichtefunktion (PDF)
+x <- seq(-5, 5, length.out = 1000)
+pdf <- dnorm(x, mean = 0, sd = 1) # f(x) Dichtefunktion = density function
+# Berechnung der uniformalen kumulativen Verteilungsfunktion (CDF)
+cdf <- pnorm(x, mean = 0, sd = 1) # F(x) Verteilungsfunktion = distribution function
+par(mfrow = c(1,2))
+plot(x, pdf, type = "l", main = "PDF (Normal)", xlab = "x", ylab = "f(x)")
+plot(x, cdf, type = "l", main = "CDF (Normal)", xlab = "x", ylab = "F(x)")
+
+## exponentiell
+# Berechnung der exponentiellen Wahrscheinlichkeits-Dichtefunktion (PDF)
+x <- seq(0, 20, length.out = 1000)
+pdf <- dexp(x, rate = 5) # f(x) Dichtefunktion = density function
+# Berechnung der exponentiellen kumulativen Verteilungsfunktion (CDF)
+cdf <- pexp(x, rate = 5) # F(x) Verteilungsfunktion = distribution function
+par(mfrow = c(1,2))
+plot(x, pdf, type = "l", main = "PDF (Exponential)", xlab = "x", ylab = "f(x)")
+plot(x, cdf, type = "l", main = "CDF (Exponential)", xlab = "x", ylab = "F(x)")
+```
+
+numerische Ausgaben am Beispiel der Normalverteilung
+```{r}
+set.seed(123)
+print(rnorm(5, mean = 0, sd = 1))     # 5 Zufallsstichproben
+print(dnorm(2, mean = 0, sd = 1))     # Dichte an x = 2
+print(pnorm(1, mean = 0, sd = 1))     # P(X ≤ 1)
+print(qnorm(0.975, mean = 0, sd = 1)) # 97.5%-Quantil
+```
+Quantilfunktion
+```{r}
+# 97.5%-Quantil (x-Wert) berechnen von einer Normalverteilung
+q_975 <- qnorm(0.975, mean = 0, sd = 1)
+q_975  # Sollte ca. 1.96 ergeben
+```
+
+Wahrscheinlichkeiten P und Quantile Q
+```{r}
+# Berechnung von P1: P(X < 4)
+P1 <- pnorm(4, mean = 2, sd = 4)
+
+# Berechnung von P2: P(0 <= X <= 4)
+P2 <- pnorm(4, mean = 2, sd = 4) - pnorm(0, mean = 2, sd = 4)
+
+# Berechnung von Q1: Gesucht wird Q1 mit P(X > Q1) = 0.95, also P(X <= Q1) = 0.05
+Q1 <- qnorm(0.05, mean = 2, sd = 4)
+
+# Berechnung von Q2: Gesucht ist Q2, so dass P(X < -Q2) = 0.05
+Q2 <- -qnorm(0.05, mean = 2, sd = 4)
+
+# Ausgabe der Ergebnisse in einer Liste
+sol <- list("Results" = c(P1 = P1, P2 = P2, Q1 = Q1, Q2 = Q2))
+sol
+```
+
+------------- estimation --------------------
+Zufallsstichproben iid als Simulation (Bsp. Normalverteilung)
+```{r}
+# Ziehe 50 iid Beobachtungen aus N(0,1)
+sample <- rnorm(n=50, mean=0, sd=1)
+# Eine zusätzliche Beobachtung hinzufügen (z.B. aus N(1,1))
+new_obs <- rnorm(1, 1, 1)
+sample <- c(sample, new_obs)
+```
+
+graphische Darstellung von Simulationen als Histogramm, hier die Varianzen (-> Poisson)
+```{r simulation-variance}
+iterations <- 1000
+simulatedValues <- replicate(iterations, {
+  sample <- rnorm(5, mean=0, sd=1)
+  var(sample)
+})
+hist(simulatedValues, probability=TRUE, main="Distribution of the Sample Variance")
+lines(density(simulatedValues), lwd=2, col="blue")
+```
+
+graphische Darstellung von Simulationen als Histogramm, danach theoretische Verteilung als Linie (distkret) darüber legen
+diskrete Verteilungssimulation mit theoretischer vertikaler Linie
+```{r}
+n_sample <- 200  # Stichprobengröße (anpassbar)
+set.seed(123)
+lambda <- 0.4
+sample <- rpois(n_sample, lambda = lambda)
+hist(sample, breaks = seq(-0.5, max(sample) + 0.5, by = 1), probability = TRUE,
+     main = "Histogramm, λ = 1, n = 200", xlab = "x", col = "lightblue", border = "black")
+lines(0:max(sample), dpois(0:max(sample), lambda = lambda), type = "h", lwd = 2, col = "red")
+```
+
+graphische Darstellung von Simulationen als Histogramm, danach theoretische Verteilung als Kurve (kontinuierlich) darüber legen
+kontinuierliche Verteilungssimulation mit theoretischer Kurve
+```{r}
+set.seed(1)
+n <- 10000
+
+means <- numeric(n)  # Speicherplatz für Mittelwerte
+st.x <- numeric(n)   # Speicherplatz für standardisierte Werte
+
+for (i in 1:n){
+  x <- rnorm(3, 2, 1)  # Ziehen einer Stichprobe von X1, X2, X3 aus N(2,1)
+  means[i] <- mean(x)
+}
+
+# Bekannte Varianz: Normalverteilung (Z-Verteilung)
+st.x.z <- (means - 2) / sqrt(1/3)
+
+# Unbekannte Varianz: t-Verteilung, die Varianz muss aus der Stichprobe (Daten) geschätzt werden
+st.x.t <- (means - 2) / sqrt(var(means)/3)
+
+grid <- seq(-3, 3, length.out = 1000)
+
+# Histogramm und Dichtekurven für die standardisierten Werte mit bekannter Varianz
+hist(st.x.z, probability = TRUE, breaks = 20, ylim = c(0,1), xlim = c(-3,3), main = "z distribution due to known variance")
+lines(density(st.x.z), col = "chartreuse4")
+lines(grid, dnorm(grid, mean = 0, sd = 1), col = "darkmagenta")
+
+# Histogramm und Dichtekurven für die standardisierten Werte mit unbekannter Varianz
+hist(st.x.t, probability = TRUE, breaks = 200, ylim = c(0,1), xlim = c(-3,3), main = "t distribution (green) due to unknown variance")
+lines(density(st.x.t), col = "chartreuse4")
+lines(grid, dnorm(grid, mean = 0, sd = 1), col = "darkmagenta")
+```
+
+
+QQ-Plot, für Normalverteilung qqnorm
+```{r}
+# Erzeugen einer Zufallsstichprobe (rnorm) aus der Normalverteilung
+set.seed(123)
+sample_norm <- rnorm(100, mean = 0, sd = 1)
+
+# QQ-Plot: Stichproben-Quantile vs. theoretische Normalquantile
+qqnorm(sample_norm, main = "QQ plot: Normal distribution")
+qqline(sample_norm, col = "red", lwd = 2)
+```
+
+QQ-Plot, für alle anderen Verteilungen
+```{r}
+set.seed(123)
+sample_exp <- rexp(100, rate = 0.5)
+
+# Theoretische Quantile basierend auf der Exponentialverteilung
+theoretical_quantiles <- qexp(ppoints(length(sample_exp)), rate = 0.5)
+
+# QQ-Plot
+qqplot(theoretical_quantiles, sample_exp, main = "QQ plot: Exponential distribution")
+qqline(sample_exp, distribution = qexp, col = "red", lwd = 2)
+# abline(0, 1, col = "red", lwd = 2) # nur als Notlösung nehmen
+```
+
+Simulationen, Zufallsvariabvlen ziehen (Uniformverteilung) und QQ-Plots mit je drei verschiedenen Samplegrössen
+```{r}
+set.seed(1)
+theta <- 8
+n <- c(10, 50, 1000)
+bins <- c(4, 8, 16)    # Anzahl der Säulen im Histogramm
+par(mfrow = c(3, 2))
+
+for (i in 1:length(n)) {
+  sample_size <- n[i]
+  x <- runif(sample_size, min = 0, max = theta)
+  
+  # Histogramm mit Dichteschätzung
+  hist(x, probability = TRUE, breaks = bins[i],
+       main = paste("Histogram, n =", sample_size),
+       xlab = "Random Variables", col = "grey", border = "black")
+  lines(density(x), col = "red", lwd = 2)
+  
+  # QQ-Plot: Theoretische Quantile vs. Stichprobe
+  qqplot(qunif(ppoints(500), min = 0, max = theta), x,
+         main = paste("QQ plot, n =", sample_size),
+         xlab = "Theoretical Quantiles", ylab = "Sample Quantiles",
+         col = "grey", pch = 16)
+  abline(0, 1, col = "red", lwd = 2)
+}
+```
+
+
+-------------- statstical testing -----------
+CLT erfordert für diskrete Verteilungen eine continuity correction
+```{r}
+# Exakte Wahrscheinlichkeit für X > 7, Bin(n=20, p=0.25), diskrete Zufallsvariable
+1 - pbinom(q=7, size=20, p=0.25)
+
+# Normalapproximation (CLT) ohne und mit Kontinuitätskorrektur:
+mu <- 20 * 0.25
+sigma <- sqrt(20 * 0.25 * 0.75)
+1 - pnorm(q=7, mean=mu, sd=sigma)      # ohne Korrektur
+1 - pnorm(q=7.5, mean=mu, sd=sigma)    # mit Korrektur
+
+n_bin <- 7
+p_bin <- 0.25
+
+mean_bin <- n_bin * p_bin
+sd_bin <- sqrt(n_bin * p_bin * (1 - p_bin))
+P_24_to_35_norm <- pnorm(35.5, mean = mean_bin, sd = sd_bin) - pnorm(23.5, mean = mean_bin, sd = sd_bin)
+```
+
+CI Grenzen einzeln ausgeben
+```{r}
+# Z <- Oral$Y / Oral$E
+# mu_hat <- mean(Z)
+# sigma_hat <- sd(Z)
+# n_total <- nrow(Oral)
+# alpha <- 0.05
+# z_val <- qnorm(1 - alpha/2)
+# CI_lower <- mu_hat - z_val * sigma_hat / sqrt(n_total)
+# CI_upper <- mu_hat + z_val * sigma_hat / sqrt(n_total)
+# cat("95%-CI for µ:", CI_lower, "-", CI_upper, "\n")
+```
+
+CI beide Grenzen ausgeben
+```{r}
+x <- rnorm(500, mean = 0, sd = 1)
+both <- mean(x) + c(-1, 1) * qnorm(0.975) * sd(x) / sqrt(length(x))
+cat("95%-CI for µ:", both, "\n")
+```
+
+
+Bootstrap basiertes CI, kompakt
+```{r}
+# set.seed(1)
+# B <- 10000
+# boot_means <- replicate(B, {
+#   sample_Z <- sample(Z, size = n_total, replace = TRUE)
+#   mean(sample_Z)
+# })
+# CI_boot <- quantile(boot_means, probs = c(0.025, 0.975))
+# cat("Bootstrap 95%-CI:", CI_boot, "\n")
+```
+
+Bootstrap basiertes CI, etwas ausführlicher
+```{r}
+# require(spam) 
+# data(Oral) 
+# 
+# n <- 544
+# set.seed(3) 
+# repeats <- 10000
+# bootstrap_means <- numeric()
+# 
+# for(i in 1:repeats){
+#   boot_sample <- sample(Oral$SMR, size = n, replace = TRUE)
+#   bootstrap_means[i] <- mean(boot_sample)
+# }
+# 
+# sol <- quantile(bootstrap_means, c(0.025, 0.975))
+# print(sol)
+```
+
+
+---------estimation ------------
+Schätzer E(X) und Var(X), cave bei Var noch /n
+```{r}
+# Beispiel: Erzeuge n Stichproben aus Pois(λ) und berechne den Stichprobenmittelwert als Schätzer
+lambda <- 2  # Beispielwert; anpassen, wenn nötig
+n_val <- 100
+X <- rpois(n_val, lambda = lambda)
+lambda_hat <- mean(X)
+var_lambda_hat <- lambda / n_val  # Varianz des Schätzers
+MSE_lambda_hat <- var_lambda_hat  # Da der Schätzer unverzerrt ist
+
+cat("E(lambda_hat (Estimation)) =", lambda, "\n")
+cat("Var(lambda_hat (Estimation)) =", var_lambda_hat, "\n")
+cat("MSE(lambda_hat (Estimation)) =", MSE_lambda_hat, "\n")
+```
+
+-----------statistical testing -----------
+Confidence Interval für Mean
+```{r}
+set.seed(14)
+x <- rnorm(10, 0, 1)
+CI <- mean(x) + c(qnorm(c(0.025, 0.975), sd = 1)) / sqrt(10)
+print(CI)
+```
+
+Likelihood Beispiel Code
+```{r}
+set.seed(1)
+grid <- seq(-2, 2, length.out = 1000)
+x <- rnorm(1, 0, 0.1)
+plot(grid, dnorm(grid, 0, 0.1), type = "l", col = "darkorchid3")
+abline(v = x)
+abline(h = dnorm(x, 0, 0.1))
+print(x)
+print(dnorm(x, 0, 0.1))
+```
+
+One-Sample t-Test
+```{r}
+set.seed(10)
+x <- round(rnorm(10, 110, 8))
+t.test(x, mu = 100)
+```
+
+p-Values eines t-Test
+```{r}
+tobs <- (mean(x) - 100) / (sd(x) / sqrt(10))
+pval <- 2 * (1 - pt(tobs, df = 9))
+print(pval)
+```
+
+Two-Sample t-Test
+```{r}
+HbSS <- c(7.2, 7.7, 8, 8.1, 8.3, 8.4, 8.4, 8.5, 8.6, 8.7, 9.1, 9.1, 9.1, 9.8, 10.1, 10.3)
+HbSb <- c(8.1, 9.2, 10, 10.4, 10.6, 10.9, 11.1, 11.9, 12.0, 12.1)
+t.test(HbSS, HbSb, var.equal = FALSE, conf.level = 0.99)
+```
+
+paired t-Test
+```{r}
+library(MASS)
+data(anorexia)
+t.test(anorexia$Prewt, anorexia$Postwt, paired = TRUE)
+```
+
+Type I Error Simulation (hier t-Test) mit Histogramm aller p-Values
+```{r}
+set.seed(5)
+R <- 10000
+n <- 10
+samples <- matrix(rnorm(R * n, mean = 0, sd = 1), R, n)
+pvals <- apply(samples, 1, function(x) t.test(x, mu = 0)$p.value)
+err <- sum(pvals < 0.05) / R
+print(err)
+hist(pvals, main = "Histogram of p-values", xlab = "p-values")
+```
+
+
+--------------- proportions ----------------
+apply Funktion verwendet zum Vergleich von p-Werten eine t.tests mit p-Werten eines chisq-Test
+```{r}
+set.seed(5)
+samples_t <- matrix(rt(R * n, df = 4), R, n)
+pvals_t <- apply(samples_t, 1, function(x) t.test(x, mu = 0)$p.value)
+typeI_t <- sum(pvals_t < 0.05) / R
+
+samples_chi2 <- matrix(rchisq(R * n, df = 10), R, n)
+pvals_chi2 <- apply(samples_chi2, 1, function(x) t.test(x, mu = 10)$p.value)
+typeI_chi2 <- sum(pvals_chi2 < 0.05) / R
+
+par(mfrow = c(1, 2))
+hist(pvals_t, main = "t-distribution", xlab = "p-values")
+hist(pvals_chi2, main = "chi-square distribution", xlab = "p-values")
+
+sol <- list(typeI_t = typeI_t, typeI_chi2 = typeI_chi2)
+print(sol)
+```
+
+Konfidenzintervalle: binom.test() vs. prop.test()
+```{r}
+ex_CI <- binom.test(x=10, n)$conf.int
+app_CI <- prop.test(x=10, n)$conf.int
+list(ex_CI = ex_CI, app_CI = app_CI)
+```
+------------ Proportions, Wald, ORCI, RRCI ----------------------------------
+Ein klinischer Versuch vergleicht zwei Behandlungen A und B für Psoriasis. Das Ergebnis gibt an, ob die Haut nach 16 Wochen Behandlung abgeheilt ist.
+
+| Outcome       | Treatment A | Treatment B |
+|---------------|-------------|-------------|
+| Cleared       | 9           | 5           |
+| Not cleared   | 18          | 22          |
+| **Total**     | 27          | 27          |
+
+Wald-Konfidenzintervall für Behandlung B
+```{r}
+WaldCI <- function(x, n){
+  se <- sqrt(x * (n - x) / n^3)
+  round(cbind(pmax(0, x/n - 1.96*se), pmin(1, x/n + 1.96*se)), 4)
+}
+# Behandlung B: 5 Erfolge bei 27 Patienten
+WaldCI(5, 27)
+
+ORCI <- function(x1, x2, n1, n2){
+  p1 <- x1/n1
+  p2 <- x2/n2
+  logOR <- log((p1 / (1 - p1)) / (p2 / (1 - p2)))
+  SElog <- sqrt(1/x1 + 1/(n1 - x1) + 1/x2 + 1/(n2 - x2))
+  round(c(exp(logOR - 1.96*SElog), exp(logOR + 1.96*SElog)), 4)
+}
+ORCI(9, 5, 27, 27)
+
+RRCI <- function(x1, x2, n1, n2){
+  p1 <- x1/n1
+  p2 <- x2/n2
+  logRR <- log(p1) - log(p2)
+  SElog <- sqrt(1/x1 - 1/n1 + 1/x2 - 1/n2)
+  round(c(exp(logRR - 1.96*SElog), exp(logRR + 1.96*SElog)), 4)
+}
+RRCI(9, 5, 27, 27)
+```
+
+Wald versus Wilson-Konfidenzintervall für p
+```{r}
+# bekannte Parameter
+# define the known parameters:
+n <- 95
+x <- 8
+
+# Exaktes Binomial-Intervall (Wald)
+CIWald <- binom.test(x, n)$conf.int #exacte CI
+
+# Wilson CI-Funktion
+WilsonCI <- function(x, n, alpha = 0.05) {
+  p_hat <- x / n
+  q <- qnorm(1 - alpha / 2) # quantile
+  CI <- p_hat + c(-1, 1) * q * sqrt((p_hat * (1 - p_hat) + q^2 / (4 * n)) / n) # compute the CI
+  return(CI)
+}
+
+CIWilson <- WilsonCI(x=x, n=n)
+
+# Ergebnisse speichern
+sol <- list(CIWald = CIWald, CIWilson = CIWilson)
+print(sol)
+```
+
+Vergleich zweier Proportionen
+```{r}
+mydata <- matrix(c(9, 5, 18, 22), nrow = 2, byrow = TRUE,
+                 dimnames = list(c("Cleared", "Not cleared"),
+                                 c("Treatment A", "Treatment B")))
+prop <- prop.test(mydata)
+prop_p_val <- prop$p.value
+prop_ci <- prop$conf.int
+
+fisher <- fisher.test(mydata)
+fisher_p_val <- fisher$p.value
+fisher_ci <- fisher$conf.int
+list(prop_p_val = prop_p_val, prop_ci = prop_ci, 
+     fisher_p_val = fisher_p_val, fisher_ci = fisher_ci)
+```
+
+Maximum-Likelihood-Schätzung für p und Odds
+```{r}
+n <- 95
+x <- 8
+p_ML <- x / n
+omega_ML <- p_ML / (1 - p_ML)
+list(p_ML = p_ML, omega_ML = omega_ML)
+```
+
+Relatives Risiko und Odds Ratio und deren CIs
+```{r}
+# 2x2 Contingency table
+a <- 9; b <- 18
+c <- 5; d <- 22
+
+# write function for OR
+ORCI <- function(x1, x2, n1, n2, alpha = 0.05) {
+  OR <- (a / b) / (c / d)
+  se_log_or <- sqrt(1 / a + 1 / b + 1 / c + 1 / d)
+  z <- qnorm(0.975)
+  CI <- exp(log(OR) + c(-1, 1) * z * se_log_or)
+  return(round(CI, 4))
+}
+
+# write function for RR
+RRCI <- function(x1, x2, n1, n2, alpha = 0.05) {
+  RR <- (a / (a + b)) / (c / (c + d))
+  se_log_rr <- sqrt(1 / a - 1 / (a + b) + 1 / c - 1 / (c + d))
+  z <- qnorm(0.975)
+  CI <- exp(log(RR) + c(-1, 1) * z * se_log_rr)
+  return(round(CI , 4))
+}
+
+# compute the two and save them
+OR_CI <- ORCI(x1 = a , x2 = b , n1 = c , n2 = d )
+RR_CI <- RRCI(x1 = a , x2 = b , n1 = c , n2 = d )
+
+sol <- list(OR_CI = OR_CI, RR_CI = RR_CI)
+print(sol)
+```
+
+einfach Tabellen gestalten
+```{r}
+table <- as.table(
+rbind(c(7, 951), c(86, 31530 ))
+)
+dimnames(table) <- list(
+c("High", "Low"),
+c("Present", "Absent")
+)
+table
+```
+
+RR und OR in einem
+```{r}
+# install.packages(Epi)
+# library(Epi)
+# twoby2(table) # p-value: H0: OR=1
+```
+
+Chi-Quadrat-Test mit UCBAdmissions
+```{r}
+library(vcd)
+data("UCBAdmissions")
+structable(Admit ~ Gender, data = UCBAdmissions)
+mosaic(Admit ~ Gender, data = UCBAdmissions)
+chisq.test(structable(Admit ~ Gender, data = UCBAdmissions))
+```
+
+Konfidenzintervall-Vergleich: Wald vs. Wilson
+```{r}
+p <- 0.4; n <- 40; x <- 0:n
+WaldCI <- function(x, n) {
+  mid <- x / n
+  se <- sqrt(x * (n - x) / n^3)
+  cbind(pmax(0, mid - 1.96 * se), pmin(1, mid + 1.96 * se))
+}
+WilsonCI <- function(x, n) {
+  mid <- (x + 1.96^2 / 2) / (n + 1.96^2)
+  se <- sqrt(n) / (n + 1.96^2) * sqrt(x / n * (1 - x / n) + 1.96^2 / (4 * n))
+  cbind(pmax(0, mid - 1.96 * se), pmin(1, mid + 1.96 * se))
+}
+Waldind <- (WaldCI(x, n)[,1] <= p) & (WaldCI(x, n)[,2] >= p)
+Wilsonind <- (WilsonCI(x, n)[,1] <= p) & (WilsonCI(x, n)[,2] >= p)
+Waldcoverage <- sum(dbinom(x, n, p) * Waldind)
+Wilsoncoverage <- sum(dbinom(x, n, p) * Wilsonind)
+
+print(Waldcoverage)
+print(Wilsoncoverage)
+```
+
+
+----title: "STA120 Prüfungslösungen (FS25)"
+----author: "Lösung zu Test Exam A & B"
+----output: html_document
+
+-----Teil A – Theoretische Aufgaben
+-----Aufgabe 1 – Theoriefragen zum statstical testing
+
+**(a)** 
+Die *p-value* (p-Wert) gibt an, wie wahrscheinlich es ist, unter der Annahme, dass die Nullhypothese stimmt, ein Ergebnis zu erhalten, das mindestens so extrem ist wie das beobachtete.
+
+**(b)**
+Die Maximum-Likelihood-Schätzung (MLE) sucht den Wert der Parameter, der die beobachteten Daten am wahrscheinlichsten macht. Man maximiert die Likelihood-Funktion bezüglich des Parameters.
+
+**(c)**
+Eine Chi-Quadrat-verteilte Zufallsvariable kann durch Summieren der Quadrate standardnormalverteilter Zufallsvariablen konstruiert werden: \( Z_1^2 + Z_2^2 + ... + Z_k^2 \sim \chi^2_k \)
+
+---
+
+----Aufgabe 2 – Poisson Verteilung
+
+**Visuale Erkennung**: Bei \( \lambda = 1 \) ist die Verteilung schmal und linksbündig, während bei \( \lambda = 10 \) die Verteilung breiter ist und symmetrischer aussieht. Eine PMF zeigt Stabdiagramm, eine CDF ist monoton wachsend.
+
+---
+
+-------- estimation -------
+----Aufgabe 3 – Binomialverteilung, estimation 
+
+```{r}
+# Definition
+n <- 7
+p <- 0.5
+
+# (a) Wertebereich
+x1_values <- 0:n
+
+# (b) Erwartungswert und Varianz von Mittelwert
+E_X <- n * p
+Var_X <- n * p * (1 - p)
+E_Xbar <- E_X
+Var_Xbar <- Var_X / 3
+
+print(E_Xbar)
+print(Var_Xbar)
+
+# (c) Erwartungswert und Varianz von Y = 3X1 + 15
+E_Y <- 3 * E_X + 15
+Var_Y <- 3^2 * Var_X
+
+print(E_Y)
+print(Var_Y)
+
+# (d) Wahrscheinlichkeiten
+P_X_less1 <- pbinom(0, n, p)
+P_X_greater3 <- 1 - pbinom(3, n, p)
+
+print(P_X_less1)
+print(P_X_greater3)
+
+# (e) Verteilung von X = X1 + X2 + X3
+# Summe von 3 Binomial(n, p) => Binomial(3n, p)
+X_total_n <- 3 * n
+X_total_p <- p
+
+# (f) Approximation durch Normalverteilung
+mu_norm <- X_total_n * X_total_p
+sigma2_norm <- X_total_n * X_total_p * (1 - X_total_p)
+
+print(mu_norm)
+print(sigma2_norm)
+```
+
+---
+
+-------- proportions -------
+----Aufgabe 4 – Behandlung A vs. B, proportions
+
+```{r}
+WaldCI <- function(x, n) {
+  se <- sqrt(x * (n - x)/n^3)
+  round(cbind(pmax(0, x/n - 1.96 * se), pmin(1, x/n + 1.96 * se)), 4)
+}
+WaldCI(5, 27)  # Treatment B
+
+ORCI <- function(x1, x2, n1, n2) {
+  p1 <- x1 / n1
+  p2 <- x2 / n2
+  logOR <- log((p1/(1 - p1)) / (p2/(1 - p2)))
+  SElog <- sqrt(1/x1 + 1/x2 + 1/(n1 - x1) + 1/(n2 - x2))
+  round(c(exp(logOR - 1.96 * SElog), exp(logOR + 1.96 * SElog)), 4)
+}
+ORCI(9, 5, 27, 27)
+```
+
+Die Nullhypothese (gleiche Erfolgswahrscheinlichkeiten) kann **nicht** verworfen werden, da das 95%-CI für die Odds Ratio [0.6251, 7.7424] 1 enthält.
+
+---
+---------- estimation and statistical testing ---------
+----Aufgabe 5 – Webseitenexperiment
+
+```{r}
+n <- 10000
+x <- 5000
+p_hat <- x / n
+se <- sqrt(p_hat * (1 - p_hat) / n)
+ci <- c(p_hat - 2 * se, p_hat + 2 * se)
+ci
+```
+
+Da 0.1 nicht im Konfidenzintervall liegt, können wir die Nullhypothese verwerfen, dass die Wahrscheinlichkeit nur 10% ist.
+
+---
+
+----Aufgabe 6 – Wahr/Falsch Aussagen
+
+```{r}
+# (a) TRUE: Var(X) = E(X²) - E(X)² => E(X²) = Var(X) + E(X)² ≥ E(X)²
+# (b) FALSE: Nur bei unabhängigen X und Y gilt Var(X+Y) = Var(X) + Var(Y)
+# (c) FALSE: Likelihood kann beliebig groß sein.
+# (d) FALSE: Der t-Test ist effizienter bei Normalverteilung.
+# (e) FALSE: CI enthält 1 => Hypothese nicht verwerfbar
+# (f) TRUE: 1 liegt nicht im CI, also verwerfbar auf 1%-Niveau
+# (g) TRUE: Ein Schätzer ist eine Funktion der Daten, also zufällig.
+# (h) FALSE: Ein *Schätzwert* ist fix nach Ziehung der Stichprobe.
+```
+
+---
+
+-------Test Exam 2025, Teil B – Praktischer Teil in R
+
+--------- EDA -----------------
+----Aufgabe 1 – Bird Data, EDA
+
+```{r}
+birds <- read.csv("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/birds.csv")
+summary(birds)
+par(mfrow = c(1,2))
+hist(birds[birds$Urban == TRUE, ]$decibels, probability = TRUE, main = "Decibels with urban noise", xlab = "Decibel")
+hist(birds[birds$Urban == FALSE, ]$decibels, probability = TRUE, main = "Decibels without urban noise", xlab = "Decibel")
+
+# check normality assumptions of urban data
+par(mfrow = c(1,2))
+qqnorm(birds[birds$Urban == TRUE, ]$decibels)
+qqline(birds[birds$Urban == TRUE, ]$decibels)
+# check normality assumptions of rural data
+qqnorm(birds[birds$Urban == FALSE, ]$decibels)
+qqline(birds[birds$Urban == FALSE, ]$decibels)
+#     The qqplots show that the assumption of normality is fulfilled, no outliers based on boxplots. 
+
+# check equal variance assumption by a F-test
+var.test(birds[birds$Urban == FALSE, ]$decibels, birds[birds$Urban ==
+TRUE, ]$decibels)
+#     Also the variances seem to be roughly equal as the high pvalue suggests. The assumptions for the t-test are fulfilled (assuming that the measurements are also independent).
+```
+
+
+
+# ```{r}
+# library(ggplot2)
+# ggplot(birds, aes(x = Urban, y = decibels)) +
+#   geom_boxplot() +
+#   geom_jitter(width = 0.1)
+# ```
+
+### T-Test, statistical testing
+```{r}
+t.test(decibels ~ Urban, data = birds, var=TRUE)
+```
+
+----------- rank based methods ---------------
+### Permutationstest Funktion
+```{r}
+perm_test <- function(data, group, values, B = 1000) {
+  observed_diff <- diff(tapply(data[[values]], data[[group]], mean))
+  diffs <- numeric(B)
+  for (i in 1:B) {
+    permuted <- sample(data[[group]])
+    diffs[i] <- diff(tapply(data[[values]], permuted, mean))
+  }
+  p_value <- mean(abs(diffs) >= abs(observed_diff))
+  list(p_value = p_value, observed = observed_diff)
+}
+perm_test(birds, "Urban", "decibels")
+```
+
+
+----- function of random variables --------
+----Aufgabe 2 – Binomialverteilung X ~ Bin(50, 0.4)
+
+```{r}
+set.seed(42)
+x_sample <- rbinom(1000, size = 50, prob = 0.4)
+hist(x_sample, breaks = 20, probability = TRUE, main = "Histogram with PMF")
+x_vals <- 0:50
+y_vals <- dbinom(x_vals, size = 50, prob = 0.4)
+points(x_vals, y_vals, col = "red", type = "h")
+
+# set.seed(42)
+# samples <- rbinom(1000, size = 50, prob = 0.4)
+# hist(samples, probability = TRUE, main = "Histogram with theoretical pmf")
+# x_theory <- 0:50
+# y_theory <- dbinom(x_theory, size = 50, prob = 0.4)
+# points(x_theory, y_theory, col = "red", type = "l")
+```
+
+------ estimation and statistical testing -------
+### Schätzung p und Wald-CI
+```{r}
+# x1 <- rbinom(1, 50, 0.4)
+# p_hat <- x1 / 50
+# se <- sqrt(p_hat * (1 - p_hat) / 50)
+# CI <- c(p_hat - 2 * se, p_hat + 2 * se)
+# CI
+
+one_sample <- rbinom(1, 50, 0.4)
+p_hat <- one_sample / 50
+se <- sqrt(p_hat * (1 - p_hat) / 50)
+CI <- c(p_hat + c(-1.96, 1.96) * se)
+CI
+```
+
+------- proportions --------
+c) binom.test is exact (because we have a binomial distribution), prop.test is an approximation (based on normal distribution)
+```{r}
+set.seed(1234)
+n <- 1000
+p_hats <- numeric(n)
+for (i in 1:n) {
+  one_sample <- rbinom(1, 50, 0.4)
+  p_hats[i] <- binom.test(one_sample, 50, p = 0.4)$p.value
+}
+sol <- mean(p_hats < 0.05)
+sol
+```
+5.1 % of all simulated p parameters are significant with a p value of less than 0.05. Because we know, that H0 is true, that means that 5.1% is the error I (false positive) what we expect when alpha = 0.05. 
+
+d) Vergleich zweier binom-Verteilungen
+```{r}
+one_sample_X <- rbinom(1, 50, 0.4)
+one_sample_Y <- rbinom(1, 40, 0.3)
+table <- rbind(
+  c(one_sample_X, 50 - one_sample_X), 
+  c(one_sample_Y, 40 - one_sample_Y)  
+)
+rownames(table) <- c("X", "Y")
+colnames(table) <- c("p", "1-p")
+OR <- (50*0.3)/(0.4*40)
+OR
+
+result <- fisher.test(table)
+result$estimate["odds ratio"]
+```
+I performed an OR. If it's unequal to 1, the groups differ. The additional fisher-test can only be performed with OR, but the fisher.test always gives different results.
+
+
+---
+
+---------- rank based methods ------------
+Vergleich von Lage- und Streuungsmaßen (Standard vs. robust)
+In dieser Aufgabe werden klassische und robuste Schätzungen für Lage (z.B. Mittelwert, Median) und Streuung (z.B. Standardabweichung, IQR, MAD) für die Variablen *mpg*, *cyl* und *wt* des Datensatzes `mtcars` verglichen.
+
+```{r}
+require(datasets)
+
+# Lage- und Streuungsmaße für mpg (miles per gallon)
+location_mpg <- c(mean(mtcars$mpg), 
+                  mean(mtcars$mpg, trim = 0.1), 
+                  median(mtcars$mpg))
+spread_mpg <- c(sd(mtcars$mpg), 
+                IQR(mtcars$mpg) / 1.349, 
+                mad(mtcars$mpg))
+
+# Lage- und Streuungsmaße für cyl (Zylinderanzahl)
+location_cyl <- c(mean(mtcars$cyl), 
+                  mean(mtcars$cyl, trim = 0.1), 
+                  median(mtcars$cyl))
+spread_cyl <- c(sd(mtcars$cyl), 
+                IQR(mtcars$cyl) / 1.349, 
+                mad(mtcars$cyl))
+
+# Lage- und Streuungsmaße für wt (Gewicht)
+location_wt <- c(mean(mtcars$wt), 
+                 mean(mtcars$wt, trim = 0.1), 
+                 median(mtcars$wt))
+spread_wt <- c(sd(mtcars$wt), 
+               IQR(mtcars$wt) / 1.349, 
+               mad(mtcars$wt))
+
+# Ergebnisliste
+sol <- list(location_mpg = location_mpg, 
+            spread_mpg = spread_mpg, 
+            location_cyl = location_cyl, 
+            spread_cyl = spread_cyl, 
+            location_wt = location_wt, 
+            spread_wt = spread_wt)
+```
+
+Wilcoxon-Mann-Whitney-Test für Wassertransfer-Daten
+Hier wird getestet, ob sich die Wassertransferrate (`pd`) zwischen zwei Altersgruppen signifikant unterscheidet. Der nichtparametrische Wilcoxon-Mann-Whitney-Test wird verwendet.
+```{r}
+# Lade Datensatz
+mydata <- read.csv("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/07water_transfer.csv")  # <- belasse diese Zeile für die Abgabe
+# Zum lokalen Testen (lokaler Pfad anpassen):
+# mydata <- read.csv("path/to/07water_transfer.csv")
+
+# Struktur des Datensatzes anzeigen
+str(mydata)
+
+# Anzahl der Beobachtungen pro Gruppe (z.B. Altersgruppe oder Zeitpunkt)
+table(mydata$age)
+
+# Wilcoxon-Mann-Whitney-Test durchführen
+wilcox <- wilcox.test(pd ~ age, data = mydata)
+
+# Ergebnisliste mit p-Wert
+sol <- list(wilcox$p.value)
+print(sol)
+```
+
+---------Permutation, compare two median ------
+Wir testen, ob sich die Verteilungen zweier Gruppen im Median signifikant unterscheiden.  
+Verwendet wird ein Permutationstest, der auf der zufälligen Neuverteilung der Gruppenzugehörigkeiten basiert. R-Funktion: `perm_test(x, y)`
+```{r}
+perm_test <- function(x, y) {
+  n <- 1000  # Anzahl Permutationen
+  tobs <- median(x) - median(y)  # Beobachtete Differenz der Mediane
+  all.data <- c(x, y)  # Alle Werte ohne Gruppenlabels
+  tsim <- array(0, n)  # Speicher für permutierte Teststatistiken
+
+  for (i in 1:n) {
+    index <- sample(1:length(all.data), length(x), replace = FALSE)
+    medianA <- median(all.data[index])
+    medianB <- median(all.data[-index])
+    tsim[i] <- medianA - medianB
+  }
+# p-Wert: Anteil der permutierten Unterschiede, die mindestens so extrem sind wie tobs
+  p_value <- sum(abs(tsim) >= abs(tobs)) / n # Wir teilen durch `n`, weil wir den **Anteil der Permutationen** berechnen, in denen die simulierte Teststatistik mindestens so extrem war wie der beobachtete Unterschied. Dies entspricht der **Definition eines p-Werts im Permutationstest**.
+  return(p_value)
+}
+
+### Datensatz vorbereiten und Test ausführen
+# Daten einlesen
+mydata <- read.csv("../data/water_transfer.csv")
+# Zwei Gruppen definieren
+yA <- mydata[mydata$age == "12-26 Weeks", 1]
+yB <- mydata[mydata$age == "At term", 1]
+set.seed(14)  # Reproduzierbarkeit
+perm_test(yA, yB)
+# - Der beobachtete p-Wert beträgt **0.085**.
+# - Da dieser p-Wert **größer als 0.05** ist, **verwerfen wir die Nullhypothese nicht**.
+# - Es gibt keinen signifikanten Unterschied im Median der beiden Gruppen.
+```
+
+Permutationstest für Medianunterschiede
+Ein eigener Permutationstest wird programmiert, um zu prüfen, ob sich die Medianwerte der Wassertransferrate zwischen den Gruppen unterscheiden.
+```{r}
+## load the data, please do not change the path:
+mydata <- read.csv("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/07water_transfer.csv")
+
+# write the function 
+perm_test <- function(x, y){
+  R <- 1000
+  # Store the "original" observed median difference
+  tobs <-  median(x) - median(y)
+  # Store the data without the group labels ( try using c() )
+  all.data <-  c(x, y)    
+  n1 <- length(x)
+  n2 <- length(y)      
+  tsim <- array(0, R)         # Preallocation of R-amount of values
+  for(i in 1:R ){
+    index <- sample(1:(n1 + n2), n1 + n2, replace = FALSE) # random permutation
+    medianxA <- median(all.data[index[1:n1]]) # Sample median of group A
+    medianxB <- median(all.data[index[(n1+1):(n1+n2)]]) # Sample median of group B
+    tsim[i] <- medianxA - medianxB  # Difference for the current iteration
+  }
+  # Sample p-value. Proportion of "some" values and amount of iterations  
+  return(mean(abs(tsim) >= abs(tobs)))
+}
+
+# We test our function:
+yA <- mydata$pd[mydata$age == "12-26 Weeks"]  # Split the data such that you have one factor per group
+yB <- mydata$pd[mydata$age == "At term"] # Split the data such that you have one factor per group
+
+set.seed(14)
+permtest <- perm_test(yA, yB)
+
+sol <- list(permtest = permtest)
+print(sol)
+```
+
+------ rank based methods, paired wilcox sign test ---------
+Visualisierung von Gewichtsunterschieden bei Anorexie
+Die Differenz des Gewichts vor und nach der Behandlung wird für zwei Gruppen (Kontrolle vs. Familientherapie) mit einem Boxplot visualisiert.
+```{r}
+png(file = "solution.png")
+
+require(MASS)
+
+# Nur die Gruppen "Cont" und "FT" auswählen
+myAnorexia <- anorexia[anorexia$Treat %in% c("Cont", "FT"), ]
+
+# Nicht benötigte Faktorstufen entfernen
+myAnorexia <- droplevels(myAnorexia)
+
+# Gewichtsdifferenz berechnen (Postwt - Prewt)
+anorexiaDiff <- myAnorexia$Postwt - myAnorexia$Prewt
+
+# Boxplot der Differenz nach Treatment-Gruppe
+boxplot(anorexiaDiff ~ myAnorexia$Treat,
+        xlab = "Treatment", ylab = "Weight difference")
+
+dev.off()
+```
+
+Wilcoxon-Mann-Whitney-Test auf Gewichtsunterschiede
+Der Gewichtsunterschied (nach–vor) wird mithilfe des Wilcoxon-Mann-Whitney-Tests zwischen Kontroll- und Familientherapiegruppe verglichen.
+```{r}
+## Datenvorbereitung wie im vorherigen Plot:
+require(MASS)
+
+# Nur Gruppen "Cont" und "FT" auswählen
+myAnorexia <- anorexia[anorexia$Treat %in% c("Cont", "FT"), ]
+myAnorexia <- droplevels(myAnorexia)
+
+# Gewichtsdifferenz berechnen
+anorexiaDiff <- myAnorexia$Postwt - myAnorexia$Prewt
+
+# Wilcoxon-Mann-Whitney-Test durchführen
+wilcox <- wilcox.test(anorexiaDiff ~ myAnorexia$Treat, exact = FALSE)
+
+# Ergebnisliste wie gefordert
+sol <- list(wilcox = wilcox$p.value)
+print(sol)
+```
+
+Gepaarter Wilcoxon-Test (vor vs. nach Behandlung)
+Hier wird für jede Gruppe (Kontrolle und Familientherapie) separat getestet, ob sich das Gewicht nach der Behandlung im Vergleich zu vorher signifikant verändert hat.
+```{r}
+require(MASS)
+
+# Datenvorbereitung wie in Aufgabe 4 (Cont und FT auswählen)
+myAnorexia <- anorexia[anorexia$Treat %in% c("Cont", "FT"), ]
+myAnorexia <- droplevels(myAnorexia)
+
+# Kontrollgruppe extrahieren
+aCont <- myAnorexia[myAnorexia$Treat == "Cont", ]
+wilcox_cont <- wilcox.test(aCont$Prewt, aCont$Postwt, paired = TRUE, exact = FALSE)
+
+# Family-Treatment-Gruppe extrahieren
+aFT <- myAnorexia[myAnorexia$Treat == "FT", ]
+wilcox_FT <- wilcox.test(aFT$Prewt, aFT$Postwt, paired = TRUE, exact = FALSE)
+
+# Ergebnisliste
+sol <- list(wilcox_cont = wilcox_cont$p.value, 
+            wilcox_FT = wilcox_FT$p.value)
+print(sol)
+```
+
+
+--------- multivariate normal distribution ----------
+------- Bivariate Normalverteilung & Abhängigkeit ------------
+
+Sampling aus einer bivariaten Normalverteilung (Scatterplot)
+Dieser Code zeigt, wie man Stichproben aus einer bivariaten Normalverteilung zieht und die Stichproben als Punktwolke darstellt.
+```{r}
+require(mvtnorm)
+set.seed(12)
+par(pty="s") # quadratischer Plot
+mu <- c(0,1)
+Sigma <- matrix(c(2, 0.5, 0.5, 1), 2, 2) 
+sample <- rmvnorm(5000, mean = mu, sigma = Sigma)
+plot(sample, pch='.', xlab='', ylab='', xlim=c(-4, 5), ylim=c(-4, 5))
+```
+
+Visualisierung der bivariaten CDF und Dichte auf Gitter (3D)
+Zeigt die kumulative Verteilungsfunktion und Dichtefunktion einer bivariaten Funktion über einem Raster mit `persp()`.
+```{r}
+require(fields)
+y <- seq(0,1,l=50)
+x <- seq(0,5, l=250)
+grid <- expand.grid(x=x, y=y)
+
+jcdf <- matrix(apply(grid, 1, function(x) x[2] - (1 - exp(-x[1]*x[2])) / x[1]), 250, 50)
+faccol <- fields::tim.colors()[cut(jcdf[-1,-1],64)]
+persp(x, y, jcdf, col=faccol, border = NA, scale=FALSE, expand=2, theta=30, phi=30, r=1000)
+
+jdensity <- matrix(apply(grid, 1, function(x) exp(-x[1]*x[2])*x[2]), 250, 50)
+faccol <- fields::tim.colors()[cut(jdensity[-1,-1],64)]
+persp(x, y, jdensity, col=faccol, border = NA, scale=FALSE, expand=2, theta=30, phi=30, r=1000)
+```
+
+Darstellung der Dichtefunktion einer bivariaten Normalverteilung (Heatmap & 3D)
+Berechnet die Dichte auf einem Gitter und visualisiert sie mit Heatmap (`image.plot`) und 3D (`persp`).
+```{r}
+require(mvtnorm)
+require(fields)
+Sigma <- matrix(c(1,2,2,5), 2, 2)
+x <- y <- seq(-3, 3, length=100)
+grid <- expand.grid(x=x, y=y)
+densgrid <- dmvnorm(grid, mean=c(0, 0), sigma=Sigma)
+jdensity <- array(densgrid, c(100, 100))
+image.plot(x, y, jdensity, col=tim.colors())
+faccol <- tim.colors()[cut(jdensity[-1,-1],64)]
+persp(x, y, jdensity, col=faccol, border = NA, theta=120, phi=30)
+```
+
+Einfluss des Korrelationskoeffizienten `rho` auf die Dichteform
+Erzeugt Stichproben für verschiedene Werte von `rho` und zeigt, wie sich die Punktwolken mit der Korrelation verändern.
+```{r}
+par(mfrow=c(2, 3))
+set.seed(12)
+rho <- c(-.25, 0, .1, .25, .75, .9)
+for (i in 1:6) {
+  Sigma <- matrix(c(1, rho[i], rho[i], 1), 2, 2)
+  sample <- rmvnorm(200, sigma=Sigma)
+  plot(sample, pch=20, xlab='', ylab='', xlim=c(-4,4), ylim=c(-4,4), cex=.4)
+  legend("topleft", legend=bquote(rho==.(rho[i])), bty='n')
+}
+```
+
+Bedingte Verteilung Y | Z = 3.5 visualisieren (rot + blau)
+Simuliert bivariate Daten, hebt Punkte mit Z ∈ [3,4] in Rot hervor, und ergänzt 100 blaue Punkte aus der bedingten Verteilung Y | Z = 3.5.
+```{r}
+# png(file="solution.png")
+require(mvtnorm)
+set.seed(14)
+par(mai = c(0.8, 0.8, 0.1, 0.1))
+mu <- c(1, 2)
+sigma <- matrix(c(1, 1, 1, 2), 2, 2)
+res <- rmvnorm(500, mean = mu, sigma = sigma)
+plot(res, xlab = "y", ylab = "z", pch = 20, xlim = c(-3, 7), ylim = c(-3, 7))
+points(res[res[,2] > 3 & res[,2] < 4, ], col = "red", pch = 20)
+z <- 3.5
+mu_y <- mu[1]; mu_z <- mu[2]
+Sigma_yy <- sigma[1,1]; Sigma_zz <- sigma[2,2]; Sigma_yz <- sigma[1,2]
+mu.constr <- mu_y + Sigma_yz / Sigma_zz * (z - mu_z)
+sigma.constr <- Sigma_yy - (Sigma_yz^2) / Sigma_zz
+y.constr <- rnorm(100, mean = mu.constr, sd = sqrt(sigma.constr))
+points(y.constr, rep(z, 100), col = "blue", pch = 20)
+# dev.off()
+```
+
+Abhängigkeit zweier Gaußscher Variablen & Verletzung der Normalität
+Zeigt, dass X und Y abhängig sind und X + Y nicht normalverteilt ist, obwohl beide einzeln Standardnormalverteilt sind.
+```{r}
+set.seed(15)
+c <- 0.5
+X <- rnorm(1000)
+Y <- ifelse(abs(X) >= c, X, -X)
+S <- X + Y
+N <- mean(S == 0)
+X0 <- sum(X == 0)
+Y0 <- sum(Y == 0)
+par(mfrow = c(2, 2))
+qqnorm(X, main = "QQ-plot of X"); qqline(X, col = "blue")
+qqnorm(Y, main = "QQ-plot of Y"); qqline(Y, col = "blue")
+qqnorm(S, main = "QQ-plot of X+Y"); qqline(S, col = "blue")
+hist(S, breaks = 50, main = "Histogram of X+Y", prob = TRUE)
+sol <- list(N = N, X0 = X0, Y0 = Y0)
+print(sol)
+```
+
+Simulation der Verteilung des Korrelationsschätzers
+Dieser Code simuliert die Verteilung eines transformierten Korrelationskoeffizienten. Hierzu werden wiederholt Stichproben aus einer bivariaten Normalverteilung gezogen, der t-Wert des Korrelationskoeffizienten berechnet und anschließend die empirische Dichte mit der theoretischen t-Dichte verglichen.
+```{r simulation-korrelation, echo=TRUE}
+require(mvtnorm)
+# Optional: set.seed(10)  # Seed setzen, falls Reproduzierbarkeit gewünscht wird
+N <- 5000
+cors <- numeric(N)
+mu <- c(0, 0)
+sigma <- matrix(c(1, 0, 0, 1), ncol = 2)
+
+for (i in 1:N) {
+  res <- rmvnorm(n = 10, mean = mu, sigma = sigma)
+  cors[i] <- cor(res)[1,2] * sqrt(10 - 2) / sqrt(1 - (cor(res)[1,2])^2)
+}
+
+grid <- seq(-10, 30, length.out = 1000)
+plot(density(cors), 
+     main = "Dichte des transformierten Korrelationskoeffizienten",
+     xlab = "Transformierter Korrelationskoeffizient")
+lines(grid, dt(grid, df = 8), col = "magenta")
+```
+
+Simulation des Pearson-Korrelationskoeffizienten und Berechnung von Konfidenzintervallen
+Hier wird für verschiedene voreingestellte Korrelationswerte (rho) jeweils ein bivariates Normalmodell simuliert. Zunächst wird der Pearson-Korrelationskoeffizient berechnet, dann werden mittels Fisher‑Z-Transformation (und Rücktransformation mit tanh) empirische 95%-Konfidenzintervalle bestimmt.
+```{r simulation-pearson, echo=TRUE}
+require(mvtnorm)
+set.seed(12)
+rho <- c(-.25, 0, .1, .25, .75, .9)
+n <- 200
+out <- matrix(0, 3, 6, dimnames = list(c("rhohat", "b_low", "b_up"), paste(rho)))
+
+for (i in 1:6) {
+  Sigma <- array(c(1, rho[i], rho[i], 1), c(2,2))
+  sample <- rmvnorm(n, sigma = Sigma)
+  out[1,i] <- cor(sample)[2]
+  out[2:3,i] <- tanh(atanh(out[1,i]) + qnorm(c(0.025, 0.975)) / sqrt(n-3))
+}
+print(out, digits = 2)
+```
+
+Anscombe-Datensatz: Visualisierung und Korrelationsanalyse
+Anhand des Anscombe-Datensatzes werden vier verschiedene Datensätze in separaten Scatterplots visualisiert. Zusätzlich werden die Korrelationskoeffizienten (Pearson, Spearman, Kendall) der Diagonalelemente des Datensatzes berechnet, um die unterschiedlichen Korrelationsmaße zu vergleichen.
+```{r anscombe, echo=TRUE}
+par(mfrow = c(1,4), cex = 0.8)
+library(faraway)  # Der Datensatz 'anscombe' wird über dieses Paket geladen
+data(anscombe)
+
+# Erstellen der Scatterplots für die vier Datensätze
+with(anscombe, { 
+  plot(x1, y1, main = "Anscombe 1")
+  plot(x2, y2, main = "Anscombe 2")
+  plot(x3, y3, main = "Anscombe 3")
+  plot(x4, y4, main = "Anscombe 4")
+})
+
+# Berechnung und Ausgabe der Korrelationskoeffizienten
+sel <- c(0:3 * 9 + 5)  # Auswahl der relevanten Korrelationswerte
+korrelationen <- rbind(
+  pearson  = cor(anscombe)[sel],
+  spearman = cor(anscombe, method = "spearman")[sel],
+  kendall  = cor(anscombe, method = "kendall")[sel]
+)
+print(korrelationen, digits = 2)
+```
+
+Simulation bivariater normalverteilter Zufallszahlen mit Ellipsen-Darstellung
+Hier werden bivariate normalverteilte Zufallszahlen bei unterschiedlichen Stichprobengrößen simuliert. Für jede Stichprobe werden theoretische Ellipsen (95% und 50% Konfidenzbereiche) eingezeichnet. Außerdem werden Schätzer für den Mittelwert und die Kovarianz berechnet und deren Ellipsen aus den Daten abgeleitet.
+```{r ellipse-simulation, echo=TRUE}
+par(mfrow = c(2, 2))
+set.seed(14)
+require(ellipse)
+n <- c(10, 50, 100, 500)       # Verschiedene Stichprobengrößen
+mu <- c(2, 1)                 # Theoretischer Mittelwert
+Sigma <- matrix(c(4, 2, 2, 2), 2)  # Theoretische Kovarianzmatrix
+
+for (i in 1:4) {
+  # Zeichnen der theoretischen Ellipsen (95% und 50% Konfidenzbereich)
+  plot(ellipse::ellipse(Sigma, centre = mu, level = 0.95), col = "gray", 
+       xaxs = "i", yaxs = "i", xlim = c(-4, 8), ylim = c(-4, 6),
+       type = "l", main = paste("Stichprobe n =", n[i]))
+  lines(ellipse::ellipse(Sigma, centre = mu, level = 0.5), col = "gray")
+  
+  # Zufallsstichprobe generieren
+  sample <- rmvnorm(n[i], mean = mu, sigma = Sigma)
+  points(sample, pch = 20, cex = 0.4)
+  
+  # Berechnung der Schätzer für Mittelwert und Kovarianz
+  muhat <- colMeans(sample)
+  Sigmahat <- cov(sample)
+  
+  # Zeichnen der geschätzten Ellipsen (95% und 50% Konfidenzbereich)
+  lines(ellipse::ellipse(Sigmahat, centre = muhat, level = 0.95), col = 2, lwd = 2)
+  lines(ellipse::ellipse(Sigmahat, centre = muhat, level = 0.5), col = 4, lwd = 2)
+  points(rbind(muhat), col = 3, cex = 2)
+  text(-2, 4, paste("n =", n[i]))
+}
+```
+
+Visualisierung der Unsicherheit bei der Parameterschätzung bivariater Normalverteilungen
+Dieses Code-Segment zeigt, wie die Unsicherheit der Parameterschätzungen (Mittelwert und Kovarianzmatrix) bei wiederholten Stichprobenziehungen dargestellt werden kann. Hierbei werden für eine fixe Stichprobengröße 100 Stichproben simuliert und die daraus abgeleiteten Parameterellipse eingezeichnet.
+```{r unsicherheit-param-schätzung, echo=TRUE}
+par(mfrow = c(1, 1))
+set.seed(14)
+n <- 50   # Feste Stichprobengröße
+R <- 100  # Anzahl der Wiederholungen
+plot(0, type = "n", xaxs = "i", yaxs = "i", xlim = c(-4, 8), ylim = c(-4, 6),
+     main = "Unsicherheit der Parameterschätzung")
+
+for (i in 1:R) {
+  sample <- rmvnorm(n, mean = mu, sigma = Sigma)
+  muhat <- colMeans(sample)
+  Sigmahat <- cov(sample)
+  lines(ellipse::ellipse(Sigmahat, centre = muhat, level = 0.95), col = 2)
+  lines(ellipse::ellipse(Sigmahat, centre = muhat, level = 0.5), col = 4)
+  points(rbind(muhat), col = 3, pch = 20)
+}
+```
+
+Simulation und Analyse einer linearen Regression mit theoretischer Kovarianzmatrix
+```{r}
+### Simulation und Analyse einer linearen Regression mit theoretischer Kovarianzmatrix
+# Setze Startwert für Zufallszahlen (für Reproduzierbarkeit)
+set.seed(4)
+# Anzahl der Simulationen (250 Regressionsdurchläufe)
+N <- 250
+# Anzahl der Datenpunkte pro Simulation
+n <- 133
+# Erzeuge erklärende Variable x: gleichmäßig verteilt zwischen 1/134 und 133/134
+x <- (1:n)/(n + 1)
+# Initialisiere Matrix zur Speicherung der Regressionskoeffizienten
+# 250 Zeilen = 250 Simulationen, 2 Spalten = β₀ und β₁
+betas <- matrix(0, N, 2)
+# Schleife über alle Simulationen
+for (i in 1:N) {
+  # Simuliere Antwortvariable y mit ε ~ N(0, 2): y = -1 + 3 * x + ε
+  y <- -1 + 3 * x + rnorm(n, 0, sqrt(2))
+  # Schätze Regressionskoeffizienten β₀ und β₁ via lm()
+  betas[i, ] <- coef(lm(y ~ x))
+}
+### Vergleich mit theoretischer Kovarianzmatrix
+# Erstelle die Designmatrix X (133 Zeilen, 2 Spalten: Intercept + x)
+X <- cbind(1, x)
+# Berechne theoretische Kovarianzmatrix: Var(β) = σ² * (XᵗX)^(-1)
+Sigma <- 2 * solve(t(X) %*% X)  # σ² = 2 gegeben
+# Zeige theoretische Kovarianzmatrix
+print(Sigma)
+### Plot der geschätzten Koeffizienten und Konfidenzellipsen
+# Lade Paket für Ellipsendarstellung
+require(ellipse)
+# Streudiagramm der geschätzten (β₀, β₁)-Werte
+plot(betas, pch = 20, main = "Simulation der Regressionskoeffizienten", xlab = expression(hat(beta)[0]), ylab = expression(hat(beta)[1]))
+# Berechne empirische Kovarianzmatrix und Zentrum der Punktwolke
+Sigmamat <- cov(betas)
+muhat <- apply(betas, 2, mean)
+# Zeichne 95%-Konfidenzellipse aus Simulation (empirisch)
+lines(ellipse(Sigmamat, centre = muhat, level = 0.95), col = 2, lwd = 2)
+# Zeichne 50%-Ellipse (empirisch)
+lines(ellipse(Sigmamat, centre = muhat, level = 0.5), col = 4, lwd = 2)
+# Zeichne 95%-Ellipse basierend auf theoretischer Kovarianzmatrix (Zentrum: wahrer Wert)
+lines(ellipse(Sigma, centre = c(-1, 3), level = 0.95), col = 2, lty = 2)
+# Zeichne 50%-Ellipse (theoretisch)
+lines(ellipse(Sigma, centre = c(-1, 3), level = 0.5), col = 4, lty = 2)
+```
+
+
+---------------- linear regression ----------------
+Lineare Regression: Analyse der Hardness-Daten
+Hier wird der Zusammenhang zwischen Temperatur und Härte anhand eines linearen Regressionsmodells untersucht. Es werden zunächst das Modell angepasst, die Regressionskoeffizienten extrahiert, gefittete Werte sowie Residuen berechnet und abschließend eine Zusammenfassung des Fits ausgegeben.
+```{r hardness-regression, echo=TRUE}
+# Datensätze: Temperatur und zugehörige Härte-Werte
+Temp <- c(30, 30, 30, 30, 40, 40, 40, 50, 50, 50, 60, 60, 60, 60) 
+Hard <- c(55.8, 59.1, 54.8, 54.6, 43.1, 42.2, 45.2, 31.6, 30.9, 30.8, 17.5, 20.5, 17.2, 16.9)
+
+# Streudiagramm der Daten mit linearem Fit
+plot(Temp, Hard, xlab = "Temperatur [°C]", ylab = "Härte [HR]",
+     main = "Lineare Regression: Härte vs. Temperatur")
+lm1 <- lm(Hard ~ Temp)  # Lineares Modell anpassen
+abline(lm1)            # Regressionsgerade hinzufügen
+
+# Extrahieren und Anzeigen der Regressionskoeffizienten
+coef_values <- coef(lm1)
+print(coef_values)
+
+# Vergleich der Beobachtungswerte, Fits und Residuen (erste 6 Beobachtungen)
+result_matrix <- rbind(observation = Hard, fitted = fitted(lm1), residuals = residuals(lm1))
+print(result_matrix[, 1:6])
+
+# Überprüfung der Residuen-Differenz
+print(head(Hard - (fitted(lm1) + residuals(lm1))))
+
+# Schätzung der Standardabweichung der Residuen
+print(summary(lm1)$sigma)
+
+# Zusammenfassung des Regressionsmodells
+summary(lm1)
+```
+
+Darstellung von Konfidenz- und Vorhersageintervallen in der Regressionsanalyse
+In diesem Beispiel wird für das angepasste Regressionsmodell sowohl das Konfidenzintervall für den mittleren Schätzwert als auch das breitere Vorhersageintervall für neue Beobachtungen berechnet und grafisch dargestellt. Die unterschiedlichen Intervalle werden überlagert, sodass der Unterschied zwischen beiden ersichtlich ist.
+```{r regression-intervalle, echo=TRUE}
+# Erstellen eines neuen Datensatzes zur Vorhersage
+new <- data.frame(Temp = seq(25, 65, by = 0.5))
+pred.w.clim <- predict(lm1, new, interval = "confidence")  # Konfidenzintervall für den Mittelwert
+pred.w.plim <- predict(lm1, new, interval = "prediction")  # Vorhersageintervall für einzelne Beobachtungen
+
+# Plotten der Originaldaten und der Vorhersageintervalle
+plot(Temp, Hard, xlab = "Temperatur [°C]", ylab = "Härte [HR]", 
+     xlim = c(28, 62), ylim = c(10, 65),
+     main = "Konfidenz- und Vorhersageintervalle")
+matlines(new$Temp, cbind(pred.w.clim, pred.w.plim[,-1]),
+         col = c(1, 2, 2, 3, 3), lty = c(1, 1, 1, 2, 2))
+```
+
+Lineare Regression – Simulation, Scatterplot, Korrelation und Schätzung der Regressionsparameter
+Hier wird das Modell simuliert. Es erfolgt ein Scatterplot, anschließend werden der Pearson- und der Spearman-Korrelationskoeffizient berechnet sowie die Regressionsparameter anhand der Formeln geschätzt.
+```{r access09-aufg1, echo=TRUE}
+set.seed(5)         ## Für reproduzierbare Simulationen 
+
+## Definieren der Parameter:
+beta0.true <- 1     ## Wahrer Interzept
+beta1.true <- 2     ## Wahrer Steigungskoeffizient
+sigma <- 2          ## Standardabweichung der Fehlerterme
+
+## Beobachtete x-Werte:
+x <- c(2.9, 6.7, 8.0, 3.1, 2.0, 4.1, 2.2, 8.9,
+       8.1, 7.9, 5.7, 1.6, 6.6, 3.0, 6.3)
+
+## Simulation der y-Werte:
+y <- beta0.true + beta1.true * x + rnorm(length(x), mean = 0, sd = sigma)
+
+## Scatterplot der simulierten Daten:
+plot(x, y, 
+     main = "Scatterplot der simulierten Daten",
+     xlab = "x",
+     ylab = "y", pch = 16)
+
+## Berechnung der Korrelationskoeffizienten:
+pearson_cor <- cor(x, y, method = "pearson")
+spearman_cor <- cor(x, y, method = "spearman")
+
+## Berechnung der Mittelwerte:
+x.mean <- mean(x)
+y.mean <- mean(y)
+
+## Schätzung der Regressionsparameter:
+beta1.hat <- sum((x - x.mean) * (y - y.mean)) / sum((x - x.mean)^2)
+beta0.hat <- y.mean - beta1.hat * x.mean
+
+sol <- list(Pearson_correlation_coefficients = pearson_cor, 
+            Spearman_correlation_coefficients = spearman_cor,
+            beta1_hat = beta1.hat, beta0_hat = beta0.hat)
+print(sol)
+```
+
+Berechnung der gefitteten Werte und Überlagerung im Scatterplot
+Hier werden die gefitteten Werte berechnet und im Scatterplot als zusätzliche (rote) Punkte sowie mit der Regressionsgeraden visualisiert.
+```{r access09-aufg2, echo=TRUE, warning=FALSE}
+# png(file="solution.png")
+set.seed(5)         ## Für reproduzierbare Simulationen 
+beta0.true <- 1     ## Wahrer Interzept
+beta1.true <- 2     ## Wahrer Steigungskoeffizient
+
+## Beobachtete x-Werte:
+x <- c(2.9, 6.7, 8.0, 3.1, 2.0, 4.1, 2.2, 8.9,
+       8.1, 7.9, 5.7, 1.6, 6.6, 3.0, 6.3)
+
+## Simulation der y-Werte:
+y <- beta0.true + beta1.true * x + rnorm(length(x), mean = 0, sd = 2)
+
+## Berechnung der Regressionskoeffizienten:
+x.mean <- mean(x)
+y.mean <- mean(y)
+beta1.hat <- sum((x - x.mean) * (y - y.mean)) / sum((x - x.mean)^2)
+beta0.hat <- y.mean - beta1.hat * x.mean
+
+## Berechnung der gefitteten Werte:
+y.fitted <- beta0.hat + beta1.hat * x
+
+## Scatterplot der Originaldaten:
+plot(x, y, 
+     main = "Scatterplot mit Regressionsgerade und gefitteten Werten",
+     xlab = "x", ylab = "y", pch = 16)
+abline(a = beta0.hat, b = beta1.hat, col = "red")  # Regressionsgerade
+points(x, y.fitted, col = "red", pch = 2)            # Gefittete Werte
+
+# dev.off()
+```
+
+Berechnung der Residuen und der Residual Sum of Squares (RSS)
+Hier werden zunächst die Residuen (Differenz zwischen beobachteten und gefitteten Werten) berechnet. Anschließend wird die Residual Sum of Squares (RSS) errechnet. Bei diesem Modell mit normalverteilten Fehlern sollten die Residuen ungefähr normalverteilt sein und keine systematische Änderung der Varianz mit den gefitteten Werten zeigen.
+```{r access09-aufg3, echo=TRUE}
+set.seed(5)         ## Für reproduzierbare Simulationen 
+beta0.true <- 1     ## Wahrer Interzept
+beta1.true <- 2     ## Wahrer Steigungskoeffizient
+
+## Beobachtete x-Werte:
+x <- c(2.9, 6.7, 8.0, 3.1, 2.0, 4.1, 2.2, 8.9,
+       8.1, 7.9, 5.7, 1.6, 6.6, 3.0, 6.3)
+
+## Simulation der y-Werte:
+y <- beta0.true + beta1.true * x + rnorm(length(x), mean = 0, sd = 2)
+
+## Berechnung der Mittelwerte:
+x.mean <- mean(x)
+y.mean <- mean(y)
+
+## Schätzung der Regressionsparameter:
+beta1.hat <- sum((x - x.mean) * (y - y.mean)) / sum((x - x.mean)^2)
+beta0.hat <- y.mean - beta1.hat * x.mean
+
+## Berechnung der gefitteten Werte:
+y.fitted <- beta0.hat + beta1.hat * x
+
+## Berechnung der Residuen:
+residuals <- y - y.fitted
+
+## Berechnung der Residual Sum of Squares (RSS):
+SS <- sum((y - y.fitted)^2)
+
+sol <- list(SS = SS)
+print(sol)
+```
+
+Empirisches 95%-Konfidenzintervall und t-Statistiken der Regressionsparameter
+In dieser Aufgabe werden für beide Regressionsparameter empirische 95%-Konfidenzintervalle berechnet. Außerdem werden die t‑Statistiken ermittelt sowie zweiseitige p‑Werte zur Überprüfung der Signifikanz bestimmt. (Hinweis: Die Freiheitsgrade betragen (n-2).)
+```{r access09-aufg4, echo=TRUE}
+set.seed(5)         ## Für reproduzierbare Simulationen 
+beta0.true <- 1     ## Wahrer Interzept
+beta1.true <- 2     ## Wahrer Steigungskoeffizient
+
+## Beobachtete x-Werte:
+x <- c(2.9, 6.7, 8.0, 3.1, 2.0, 4.1, 2.2, 8.9,
+       8.1, 7.9, 5.7, 1.6, 6.6, 3.0, 6.3)
+
+## Simulation der y-Werte:
+y <- beta0.true + beta1.true * x + rnorm(length(x), mean = 0, sd = 2)
+
+## Berechnung der Mittelwerte:
+x.mean <- mean(x)
+y.mean <- mean(y)
+
+## Schätzung der Regressionsparameter:
+beta1.hat <- sum((x - x.mean) * (y - y.mean)) / sum((x - x.mean)^2)
+beta0.hat <- y.mean - beta1.hat * x.mean
+
+## Berechnung der gefitteten Werte:
+y.fitted <- beta0.hat + beta1.hat * x
+
+## Berechnung der Residuen und RSS:
+residuals <- y - y.fitted
+SS <- sum(residuals^2)
+
+n <- length(x)
+sigma.e <- sqrt(SS / (n - 2))
+
+## Berechnung der Standardfehler:
+beta1.se <- sigma.e / sqrt(sum((x - x.mean)^2))
+beta0.se <- sigma.e * sqrt(1/n + (x.mean^2) / sum((x - x.mean)^2))
+
+## Berechnung der 95%-Konfidenzintervalle:
+beta0.ci <- beta0.hat + c(-1, 1) * qt(0.975, df = n - 2) * beta0.se
+beta1.ci <- beta1.hat + c(-1, 1) * qt(0.975, df = n - 2) * beta1.se
+
+## Berechnung der t-Statistiken:
+t0 <- beta0.hat / beta0.se
+t1 <- beta1.hat / beta1.se
+
+## Zwei-seitige p-Werte:
+p.value0 <- 2 * pt(-abs(t0), df = n - 2, lower.tail = TRUE) # eher abs ohne -
+p.value1 <- 2 * pt(-abs(t1), df = n - 2, lower.tail = TRUE) # eher abs ohne -
+
+sol <- list(beta0_ci = beta0.ci, beta1_ci = beta1.ci,
+            t0 = t0, t1 = t1, pvalue0 = p.value0, pvalue1 = p.value1)
+print(sol)
+```
+
+Verifikation der Ergebnisse mit lm() und zugehörigen Methoden
+Hier werden die Ergebnisse der manuellen Berechnungen zur linearen Regression mit denen der R‑Funktion `lm()` überprüft. Es werden die Modellzusammenfassung, die gefitteten Werte, Residuen und 95%-Konfidenzintervalle mittels entsprechender Methoden ermittelt.
+```{r access09-aufg5, echo=TRUE}
+set.seed(5)         ## Für reproduzierbare Simulationen 
+beta0.true <- 1     ## Wahrer Interzept
+beta1.true <- 2     ## Wahrer Steigungskoeffizient
+
+## Beobachtete x-Werte:
+x <- c(2.9, 6.7, 8.0, 3.1, 2.0, 4.1, 2.2, 8.9,
+       8.1, 7.9, 5.7, 1.6, 6.6, 3.0, 6.3)
+
+## Simulation der y-Werte:
+y <- beta0.true + beta1.true * x + rnorm(length(x), mean = 0, sd = 2)
+
+## Erstellung des data.frame:
+data <- data.frame(x = x, y = y)
+
+## Erstellung des linearen Modells:
+mod <- lm(y ~ x, data = data)
+smry <- summary(mod)
+fit <- fitted(mod)
+res <- residuals(mod)
+ci <- confint(mod, level = 0.95)
+
+sol <- list(summary = smry, fitted = fit, residuals = res, ci = ci)
+print(sol)
+```
+
+Darstellung von Konfidenz- und Vorhersageintervallen mittels predict()
+Hier wird anhand des zuvor angepassten Modells gezeigt, wie mittels der Funktion `predict()` sowohl ein Konfidenzintervall für den Mittelwert als auch ein Vorhersageintervall für neue Beobachtungen erzeugt und in einem Scatterplot dargestellt werden. Der Unterschied: Das Konfidenzintervall (blau) ist schmaler, da es die Unsicherheit der mittleren Schätzung reflektiert, während das Vorhersageintervall (grün) breiter ist, da es die zusätzliche Varianz einzelner Beobachtungen mitberücksichtigt.
+```{r access09-aufg6, echo=TRUE}
+# png(file="solution.png")
+
+set.seed(5)         ## Für reproduzierbare Simulationen 
+beta0.true <- 1     ## Wahrer Interzept
+beta1.true <- 2     ## Wahrer Steigungskoeffizient
+
+## Beobachtete x-Werte:
+x <- c(2.9, 6.7, 8.0, 3.1, 2.0, 4.1, 2.2, 8.9,
+       8.1, 7.9, 5.7, 1.6, 6.6, 3.0, 6.3)
+       
+## Simulation der y-Werte:
+y <- beta0.true + beta1.true * x + rnorm(length(x), mean = 0, sd = 2)
+data <- data.frame(x = x, y = y)
+
+## Berechnungen der Regressionsparameter:
+x.mean <- mean(x)
+y.mean <- mean(y)
+beta1.hat <- sum((x - x.mean) * (y - y.mean)) / sum((x - x.mean)^2)
+beta0.hat <- y.mean - beta1.hat * x.mean
+y.fitted <- beta0.hat + beta1.hat * x
+mod <- lm(y ~ x, data = data)
+
+## Vorhersage für fein aufgelöste x-Werte:
+xx <- seq(0, 10, by = 0.01)
+newdata <- data.frame(x = xx)
+p.confidence <- predict(mod, newdata = newdata, interval = "confidence")
+p.prediction <- predict(mod, newdata = newdata, interval = "prediction")
+
+## Plot der Daten und Intervalle:
+plot(x, y,
+     main = "Konfidenz- und Vorhersageintervall",
+     xlab = "x", ylab = "y", pch = 16)
+abline(a = beta0.hat, b = beta1.hat, col = "red")   # Regressionsgerade
+points(x, y.fitted, col = "red", pch = 2)             # Gefittete Punkte
+
+# Konfidenzintervall (blau, gestrichelt)
+lines(xx, p.confidence[, "upr"], col = "blue", lty = 2)
+lines(xx, p.confidence[, "lwr"], col = "blue", lty = 2)
+
+# Vorhersageintervall (grün, punktiert)
+lines(xx, p.prediction[, 2], col = "green", lty = 3)
+lines(xx, p.prediction[, 3], col = "green", lty = 3)
+
+# dev.off()
+```
+
+Lineares Modell ohne Intercept
+Hier wird ein Modell ohne Intercept angepasst (d.h. es wird erzwungen, dass (beta_0 = 0)). Der Vergleich der Regressionsgeraden (mit vs. ohne Intercept) im Scatterplot zeigt, welches Modell die Daten besser beschreibt – in unserem Simulationsmodell mit (beta_0 = 1) passt das Modell mit Intercept in der Regel besser.
+```{r access09-aufg7, echo=TRUE}
+# png(file="solution.png")
+set.seed(5)         ## Für reproduzierbare Simulationen 
+beta0.true <- 1     ## Wahrer Intercept
+beta1.true <- 2     ## Wahrer Steigungskoeffizient
+
+## Beobachtete x-Werte:
+x <- c(2.9, 6.7, 8.0, 3.1, 2.0, 4.1, 2.2, 8.9,
+       8.1, 7.9, 5.7, 1.6, 6.6, 3.0, 6.3)
+       
+## Simulation der y-Werte:
+y <- beta0.true + beta1.true * x + rnorm(length(x), mean = 0, sd = 2)
+data <- data.frame(x = x, y = y)
+
+## Anpassen der Modelle:
+mod <- lm(y ~ x, data = data)      # Modell mit Interzept
+mod2 <- lm(y ~ x - 1, data = data)   # Modell ohne Interzept
+
+par(mfrow = c(1, 1))
+plot(data$x, data$y, 
+     main = "Scatterplot mit LM-Fits (mit und ohne Intercept)", 
+     xlab = "x", ylab = "y", pch = 16)
+abline(mod, col = "red")                    # LM mit Intercept (rote Linie)
+abline(a = 0, b = coef(mod2), col = "blue", lty = 2)   # LM ohne Intercept (blaue, gestrichelte Linie)
+
+# dev.off()
+```
+
+Einfluss von Ausreißern auf den Modellfit
+In diesem Beispiel wird untersucht, wie Ausreißer den Fit eines linearen Modells beeinflussen. Zuerst wird der Datensatz um drei Ausreißer erweitert, die dann in einem Scatterplot farblich hervorgehoben werden. Anschließend wird ein lineares Modell an den erweiterten Datensatz angepasst und mit Hilfe der diagnostischen Plots (Residuals vs. Fitted, Normal Q-Q, etc.) überprüft, ob Modellannahmen verletzt werden.
+```{r access09-aufg8, echo=TRUE}
+# png(file="solution.png")
+set.seed(5)         ## Für reproduzierbare Simulationen 
+beta0.true <- 1     ## Wahrer Intercept
+beta1.true <- 2     ## Wahrer Steigungskoeffizient
+
+## Beobachtete x-Werte:
+x <- c(2.9, 6.7, 8.0, 3.1, 2.0, 4.1, 2.2, 8.9,
+       8.1, 7.9, 5.7, 1.6, 6.6, 3.0, 6.3)
+       
+## Simulation der y-Werte:
+y <- beta0.true + beta1.true * x + rnorm(length(x), mean = 0, sd = 2)
+data <- data.frame(x = x, y = y)
+
+## Erweiterung des Datensatzes um Ausreißer:
+data_outlier <- rbind(data, data.frame(x = c(10, 11, 12), y = c(9, 7, 8)))
+
+par(mfrow = c(2, 3))
+# Scatterplot: Originaldaten (schwarz) und Ausreißer (rot) hervorheben
+plot(data_outlier$x, data_outlier$y, 
+     col = c(rep(1, nrow(data)), rep(2, 3)), 
+     main = "Scatterplot mit Ausreißern", 
+     xlab = "x", ylab = "y", pch = 16)
+
+## Anpassung eines linearen Modells an den erweiterten Datensatz:
+model_outlier <- lm(y ~ x, data = data_outlier)
+
+## Erzeugen der diagnostischen Plots:
+plot(model_outlier)
+
+# dev.off()
+```
+
+------------- Multiple Lineare Regression -------------
+Daten vorbereiten, erstes Beispiel
+Lade Datensatz zur Stickstoffsäureproduktion:
+```{r}
+stackloss <- read.table(header = TRUE, sep = ",", text = "
+Air,Temp,Acid.,Stkloss
+80,27,58.9,4.2
+80,27,58.8,3.7
+75,25,59,3.7
+62,24,58.7,2.8
+62,22,58.7,1.8
+62,23,58.7,1.8
+62,24,59.3,1.9
+62,24,59.3,2.0
+58,23,58.7,1.5
+58,18,58.0,1.4
+58,18,58.9,1.4
+58,17,58.8,1.3
+58,18,58.2,1.1
+58,19,59.3,1.2
+50,18,58.9,0.8
+50,18,58.6,0.7
+50,19,57.2,0.8
+50,19,57.9,0.8
+50,20,58.0,0.9
+56,20,58.2,1.5
+70,20,59.1,1.5
+")
+```
+
+```{r}
+mydata <- read.table("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/10stackloss.txt", header = TRUE, sep = ",")
+str(mydata)
+```
+
+Überblick über die Daten
+```{r}
+summary(stackloss)
+```
+
+Multiple lineare Regression: Boxplots
+```{r}
+par(mfrow = c(1, 4))
+boxplot(mydata$Air, xlab = "Airflow")
+boxplot(mydata$Temp, xlab = "Temp")
+boxplot(mydata$Acid., xlab = "Acid.")
+boxplot(mydata$Stkloss, xlab = "Stackloss")
+```
+
+Multiple lineare Regression: Pairs Plot
+```{r}
+pairs(mydata, gap = 0, col = c(mydata$Air > 70) + 1)
+```
+
+Multiple lineare Regression: Regression & Diagnostik, Diagnoseplot
+```{r}
+fit_full <- lm(Stkloss ~ Air + Temp + Acid., data = mydata)
+summary(fit_full)
+
+par(mfrow = c(2, 2))
+plot(fit_full)
+```
+
+Multiple lineare Regression: Multikollinearität & VIF
+```{r}
+cor(mydata[c("Air", "Temp", "Acid.")])
+
+library(car)
+vif(fit_full)
+```
+
+Multiple lineare Regression: Modellselektion & Vergleich, einflussreiche Punkte
+```{r}
+step_model <- step(fit_full)
+summary(step_model)
+
+influence.measures(fit_full)
+
+fit_nested <- lm(Stkloss ~ Air + Temp, data = mydata)
+summary(fit_nested)
+
+sol <- list(
+  Multicollinearity_exists = "No", 
+  predictor_that_can_be_removed = "Acid", 
+  optimal_model = lm(Stkloss ~ Air + Temp, data = mydata)
+)
+print(sol)
+```
+
+Multiple lineare Regression: Daten vorbereiten, zweites Beispiel
+```{r}
+salary <- read.csv("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/10salary.csv")
+salary$districtSize <- as.factor(salary$districtSize)
+str(salary)
+```
+
+Multiple lineare Regression: Pairs Plot und Scatterplot
+```{r}
+# set seed for reproducibility
+set.seed(16)
+
+# read in the data (do not change the code here but in your local RStudio)
+mydata <- read.table("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/salary.txt", header = TRUE, sep = ",")
+# we need to convert 'District' into a factor
+mydata$District <- as.factor(mydata$District)
+
+# pairs plot (alle Variablen auswählen in der korrekten Reihenfolge)
+pairs(mydata[, c("District", "districtSize", "salary", "experience")], 
+      gap = 0, 
+      main = "Pairs plot of the data")
+library(ggplot2)
+ggplot(salary, aes(x = experience, y = salary, color = districtSize)) +
+  geom_point() +
+  labs(title = "Scatterplot: Salary vs. Experience by District Size")
+```
+
+Multiple lineare Regression: Modelle für jede Gruppierung
+```{r}
+lm_small <- lm(salary ~ experience, data = salary[salary$districtSize == 1, ])
+lm_medium <- lm(salary ~ experience, data = salary[salary$districtSize == 2, ])
+lm_large <- lm(salary ~ experience, data = salary[salary$districtSize == 3, ])
+summary(lm_small)
+summary(lm_medium)
+summary(lm_large)
+
+plot(mydata$experience, mydata$salary,
+     xlab = "Experience", ylab = "Salary",
+     col = c("black", "red", "green")[mydata$districtSize],
+     main = "Salary against experience", pch = 1)
+legend("bottomright", legend = c("districtSize 1", "districtSize 2", "districtSize 3"),
+       pch = 1, col = c("black", "red", "green"), bty = "n")
+abline(lm_small, col = "black")
+abline(lm_medium, col = "red")
+abline(lm_large, col = "green")
+```
+
+Multiple lineare Regression: Gemeinsames Modell
+```{r}
+lm_all <- lm(salary ~ experience + districtSize, data = salary)
+summary(lm_all)
+```
+
+Multiple lineare Regression: Diagnostic plot
+```{r}
+par(mfrow = c(2, 2))
+plot(lm_all)
+```
+
+------------------ ANOVA ------------------------
+ANOVA Datenbeschreibung und Visualisierung
+Untersuchung der Verteilung von Octocrylen (OC) je nach Behandlung und Monat, basierend auf log-transformierten Konzentrationen.
+```{r}
+# png(file="solution.png")
+
+# set the seed for reproducibility
+set.seed(26)
+
+# load the data
+chem <- read.table("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/11chemosphere_OC.csv", header = TRUE, sep = ",")
+
+# log transform the OC-variable:
+chem$logOC <- log(chem$OC)
+
+# take a look at the data:
+head(chem)
+str(chem)
+
+# take a look at the design of the experiment:
+table(chem[ ,c("Behandlung", "Monat")])
+# table(chem$Behandlung, chem$Monat)
+
+# Boxplots with the two factors
+par(mfrow = c(1, 2))
+boxplot(chem$logOC ~ Behandlung, data = chem, main = "log(OC) by Treatment", ylab = "log(OC)")
+boxplot(chem$logOC ~ Monat, data = chem, main = "log(OC) by Month", ylab = "log(OC)")
+# boxplot(logOC ~ chem$Behandlung, data = chem, main = "log(OC) by Treatment", ylab = "log(OC)")
+# boxplot(logOC ~ chem$Monat, data = chem, main = "log(OC) by Month", ylab = "log(OC)")
+# dev.off()
+```
+
+ANOVA – Einfaktorielle ANOVA
+Modellierung der log(OC)-Werte durch den Einfluss der Behandlung.
+```{r}
+chem <- read.table("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/11chemosphere_OC.csv", 
+                   header = TRUE, sep = ",")
+chem$logOC <- log(chem$OC)
+
+fit1lm <- lm(chem$logOC ~ Behandlung, data = chem)
+fit1lm_anova <- anova(fit1lm)
+
+par(mfrow = c(2, 2))
+plot(fit1lm)
+
+sol <- list(owANOVA = fit1lm_anova)
+print(sol)
+```
+
+ANOVA – Zweifaktorielle ANOVA (Behandlung + Monat)
+Test auf zusätzlichen Monatseffekt.
+```{r}
+chem <- read.table("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/11chemosphere_OC.csv", 
+                   header = TRUE, sep = ",")
+chem$logOC <- log(chem$OC)
+
+fit2lm <- lm(chem$logOC ~ Behandlung + Monat, data = chem)
+fit2lm_anova <- anova(fit2lm)
+fit2lm_anova
+
+sol <- list(twANOVA = fit2lm_anova, effect = "No")  # Falls der p-Wert von Monat < 0.05 ist, sonst "No"
+print(sol)
+```
+Prüfen Sie den p-Wert für den Faktor Monat in fit2lm_anova.
+Ist der p-Wert < 0.05, geben Sie "Yes" für einen Monatseffekt an, sonst "No".
+
+ANOVA – Interaktion: Behandlung * Monat
+Test auf Interaktion zwischen Behandlung und Monat.
+```{r}
+chem <- read.table("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/11chemosphere_OC.csv", 
+                   header = TRUE, sep = ",")
+chem$logOC <- log(chem$OC)
+
+fit2lmfull <- lm(chem$logOC ~ Behandlung * Monat, data = chem)
+fit2lmfull_anova <- anova(fit2lmfull)
+
+# with(chem, interaction.plot(Monat, Behandlung, chem$logOC, type = "b",
+#                             col = c("red", "blue", "green"), pch = c(16, 18, 15),
+#                             main = "Interaction between Monat and Behandlung"))
+with(chem, interaction.plot(Behandlung, Monat, chem$logOC, type = "b",
+                            col = c("red", "blue"), pch = c(16, 18),
+                            main = "Interaction between Monat and Behandlung"))
+
+sol <- list(ANOVA = fit2lmfull_anova)
+print(sol)
+```
+Im ANOVA-Output: Die Zeile Behandlung:Monat testet die Interaktion.
+Ein signifikanter p-Wert (< 0.05) zeigt, dass sich der Einfluss der Behandlung zwischen den Monaten unterscheidet.
+Das interaction.plot() zeigt visuell, ob sich die Linien kreuzen (Hinweis auf Interaktion).
+
+ANOVA – ANCOVA mit Produktion
+Analyse des Einflusses von Behandlung und Produktion auf log(OC), inklusive Vergleich der Reihenfolge der Prädiktoren.
+```{r}
+chem <- read.table("/Users/TR/Desktop/STA 120, intro to statistics/Daten und R-Vorlagen/11chemosphere_OC.csv", 
+                   header = TRUE, sep = ",")
+chem$logOC <- log(chem$OC)
+
+fit3new <- lm(chem$logOC ~ Behandlung + Produktion, data = chem)
+fit3new_anova <- anova(fit3new)
+
+fit3alt <- lm(chem$logOC ~ Produktion + Behandlung, data = chem)
+fit3alt_anova <- anova(fit3alt)
+
+sol <- list(ANOVA_new = fit3new_anova, ANOVA_alt = fit3alt_anova)
+print(sol)
+```
+ANCOVA kombiniert kategoriale (Behandlung) und metrische (Produktion) Einflussgrößen.
+Der Unterschied zwischen den Modellen liegt in der Reihenfolge der Terme:
+Das liegt an der Funktionsweise von anova() in R, die bei sequentieller Typ-I-ANOVA die Reihenfolge berücksichtigt.
+Typ-I-ANOVA testet jeweils den Effekt eines Terms nach dem vorangehenden.
+Daher kann Behandlung + Produktion einen anderen p-Wert liefern als Produktion + Behandlung.
+
+---------------- Bayesian methods --------
+
+Normal-normal distribution bei Bayesian methods
+```{r}
+grid <- seq(-10, 10, length.out = 200) 
+mu <- c(0, 0, 1, 1)   # specify the four distributions  
+sigma <- c(1, 2, 1, 2) 
+
+# The first distribution to set up the plot
+plot(grid, dnorm(grid, mean = mu[1], sd = sigma[1]), type = "l", lwd = 2, col = 2,
+     xlab = expression(mu), ylab = "pdf", ylim = c(0, 0.5))
+
+# The remaining distributions
+for(i in 2:4){
+  lines(grid, dnorm(grid, mean = mu[i], sd = sigma[i]), lwd = 2, col = i + 1)
+}
+
+
+legend("topright",
+       legend = paste0("(mu,sigma)=(", paste0(mu, ",", sigma), ")"),
+       lwd = 2, col = 2:5)
+```
+
+Normal-Normal distribution
+```{r}
+# Information about data:
+ybar <- 2.1
+n <- 4
+sigma2 <- 1
+
+# information about prior:
+priormean <- 0
+priorvar <- 2
+
+# Calculating the posterior variance and mean:
+postvar <- 1/( n/sigma2 + 1/priorvar)
+postmean <- postvar*( ybar*n/sigma2 + priormean/priorvar )
+
+# Plotting follows:
+y <- seq(-2, to=4, length=500)
+
+plot( y, dnorm( y, postmean, sqrt( postvar)), type='l', col=4, #Posterior
+  ylab='Density', xlab=bquote(mu))
+
+lines( y, dnorm( y, ybar, sqrt( sigma2/n)), col=3) # Data
+lines( y, dnorm( y, priormean, sqrt( priorvar)), col=5) # Prior
+
+legend( "topleft", legend=c("Data/likelihood", "Prior", "Posterior"),
+  col=c(3, 5, 4), bty='n', lty=1)
+```
+
+Die Beta distribution bei Bayesian methods
+```{r}
+y <- 10
+n <- 13
+alpha <- 5
+beta <- 5
+
+phat <- y/n   # likelihood estimate
+
+x <- seq(.001, to=.999, length=200)      # fine sequence for posterior
+plot(x, dbeta(x, y+alpha, n-y+beta), type='l', ylab='', xlab='p', col=4)
+lines(x, dbeta(x, alpha, beta), col=5)   # now prior
+
+rug( phat, ticksize=0.3, col=3)          # plot likelihood
+mtext( bquote(hat(p)), side=1, at=phat, line=.5)
+legend( "topleft", legend=c("Data/likelihood", "Prior", "Posterior"), 
+       col=c(3,5,4), bty='n', lty=1)
+```
+
+Die Gamma-Verteilung mit Parametern bei Bayesian methods
+α (shape) und β (rate) ist eine Verallgemeinerung der Exponentialverteilung. 
+Wenn α=1, dann ist die Gamma-Verteilung identisch zur Exponentialverteilung mit Rate β. 
+Also: Wenn κ∼Gamma(1,β) ⇒ κ∼Exponential(β)
+Interpretation der Parameter α, β:
+α=1: Exponentielle Zerfallsstruktur – man glaubt, dass kleinere Werte von κ wahrscheinlicher sind.
+α>1: Man glaubt an ein „typisches“ 
+κ>0, also an eine Verteilung mit Modus.
+β: Skaliert die Verteilung; größere β → kürzere Skala → geringere Werte wahrscheinlicher.
+Gamma distribution bei Byesian methods
+```{r}
+# png(file = "solution.png")
+# set seed for reproducibility:
+set.seed(16)
+# define grid:
+grid <- seq(0, 5, length.out = 200)
+# define parameters
+alpha <- c(1, 1, 2, 2)  # shape
+beta  <- c(1, 2, 1, 2)  # rate
+# plot first density
+plot(x = grid, dgamma(grid, shape = alpha[1], rate = beta[1]),
+     type = "l", lwd = 2, col = 2,
+     xlab = expression(kappa), ylab = "pdf", ylim = c(0, 2))
+# plot remaining densities
+for (i in 2:4) {
+  lines(grid, dgamma(grid, shape = alpha[i], rate = beta[i]),
+        lwd = 2, col = i + 1)
+}
+legend("topright",
+       legend = paste0("(alpha,beta)=(", alpha, ",", beta, ")"),
+       lwd = 2, col = 2:5)
+# dev.off()
+```
+Plot-Interpretation:
+(1,1): Exponentialverteilung mit Rate 1
+(1,2): Exponentialverteilung mit Rate 2 (schnellerer Zerfall)
+(2,1): Modus > 0, lange rechte Seite – Glaube an typischen Mittelwert
+(2,2): Dichtes Zentrum um einen kleineren Mittelwert
+Diese Parameterwahl reflektiert unterschiedliche Vorannahmen („beliefs“) über die Wahrscheinlichkeitsverteilung von κ, z.B. ob eher kleine oder moderate Werte erwartet werden.
+
+--------------- Monte Carlo Simulationen --------------
+
+Monte Carlo Methoden
+Monte Carlo Simulation, Approximation von pi
+```{r, pi simulation}
+set.seed(1)
+n <- 1000
+x <- runif(n, -1, 1)
+y <- runif(n, -1, 1)
+x2_y2 <- x*x + y*y
+my_data <- data.frame(x = x, y = y, s = x2_y2,
+                      cond = (x2_y2 < 1)+1)
+my_pi <- 4 * mean(x^2 + y^2 < 1)
+my_pi
+
+par(pty="s")
+if (n < 10001)
+  plot(x~y, col = cond, data = my_data  )
+```
+
+```{r first approximation with plot, echo=F, cache=T}
+# Now with plotting
+# we need to store more variables so I do the code again, but dont show it
+# on the slides, that would get confusing for teaching.
+
+library(ggplot2)
+num_iterations <- 10000 # reuse from above if you want
+points_inside <- 0
+points_outside <- 0
+
+# Vectors to store points
+x_points <- numeric(num_iterations)
+y_points <- numeric(num_iterations)
+point_colors <- character(num_iterations)
+
+for (i in 1:num_iterations) {
+  x <- runif(1, -1, 1)
+  y <- runif(1, -1, 1)
+  
+  x_points[i] <- x
+  y_points[i] <- y
+  
+  if (sqrt(x^2 + y^2) <= 1) { # if within one unit: inside
+    points_inside <- points_inside + 1
+    point_colors[i] <- "inside"
+  } else {
+    points_outside <- points_outside + 1
+    point_colors[i] <- "outside"
+  }
+}
+
+pi_estimate <- 4 * points_inside / num_iterations
+pi_estimate
+```
+
+```{r, echo=F, cache=T, fig.height=5, fig.width=10}
+# Create a data frame for plotting
+plot_data <- data.frame(x = x_points, y = y_points, color = point_colors)
+ggplot(plot_data, aes(x = x, y = y, color = color)) +
+  geom_point(size = 0.5, alpha = 0.5) +
+  scale_color_manual(values = c("inside" = "blue", "outside" = "red")) +
+  coord_fixed() +
+  theme_minimal() +
+  ggtitle("Monte Carlo Approximation of Pi") +
+  xlab("X") +
+  ylab("Y") +
+  geom_path(data = data.frame(theta = seq(0, 2 * pi, length.out = 100)),
+            aes(x = cos(theta), y = sin(theta)), color = "black", size = 1)
+
+```
+
+Monte Carlo Simulation, Konvergenz bei pi-Approximation
+```{r}
+set.seed(14)
+m <- 49
+n <- round(10 + 1.4^(1:m))
+piapprox <- sapply(n, function(n_i) 4 * mean(rowSums(matrix(runif(2*n_i), ncol=2)^2) <= 1))
+plot(n, abs(piapprox - pi)/pi, log='xy', type='l')
+lines(n, 1/sqrt(n), col=2, lty=2)
+```
+
+Monte Carlo Simulation, Volumen der Einheitskugel in R^d
+```{r}
+set.seed(14)
+d <- 2:10
+n <- 15000
+volapprox <- sapply(d, function(dim) {
+  X <- matrix(runif(n * dim, -1, 1), ncol=dim)
+  mean(rowSums(X^2) <= 1) * 2^dim
+})
+exact <- pi^(d/2) / gamma(d/2 + 1)
+cbind(dimension = d, exact, volapprox)
+```
+
+Monte Carlo Simulation, Wahrscheinlichkeit P(X > Y^2) berechnen/approximieren
+```{r}
+library(mvtnorm)
+set.seed(14)
+sample <- rmvnorm(10000, mean = c(0,0), sigma = matrix(c(1,2,2,5), 2)) # bivariate (X,Y) Normalverteilung
+prob <- mean(sample[,1] > sample[,2]^2) # sample[,1] → alle X-Werte, sample[,2] → alle Y-Werte
+print(prob)
+```
+
+Monte Carlo Simulation, Beta function sampling, Beta ist die Zielverteilung
+```{r}
+m <- 0.02 # m ist ein Skalierungsfaktor, sodass m * f_Z(y) größer oder gleich der Zielverteilung ist (das ist nötig für Rejection Sampling).
+y <- seq(0,1,length.out = 500)
+# Zielverteilung:
+fst <- function(y) y^(6-1) * (1-y)^(3-1) # fst(y) ist die Zielverteilung (Beta(6,3), unnormiert)
+# Vorschlagsverteilung:
+f_Z <- function(y) ifelse( y >= 0 & y <= 1, 1, 0) # f_Z(y) ist die Vorschlagsverteilung, hier die Uniformverteilung auf [0,1].
+# Plot der (nicht normierten) Zielverteilung:
+plot(y, fst(y), ylim = c(0,0.025), col = "darkolivegreen", type  = "l")
+# m * f_Z(y) ist die skalierte Vorschlagsverteilung (als horizontale Linie):
+lines(y, m*f_Z(y))
+```
+
+Monte Carlo Simulation, Rejection Sampling – Beta(6,3)
+```{r}
+set.seed(14)
+n.sim <- 1000
+# Unnormierte Zielverteilung (Beta(6,3)):
+fstar <- function(y) y^5 * (1-y)^2
+# Vorschlagsverteilung: Gleichverteilung auf [0,1]:
+f_Z <- function(y) ifelse(y >= 0 & y <= 1, 1, 0)
+m <- 0.02 # m ist ein Skalierungsfaktor, sodass m * f_Z(y) größer oder gleich der Zielverteilung ist (das ist nötig für Rejection Sampling).
+samples <- runif(n.sim) # n.sim Zufallszahlen aus U(0,1) als y-Proben, Vorschläge
+u <- runif(n.sim) # n.sim Zufallszahlen aus U(0,1) als Schwellenwerte
+accepted <- u < fstar(samples) / (m * f_Z(samples)) # Akzeptanzbedingung
+result <- samples[accepted]
+mean(accepted)
+hist(result, col=4, main="Rejection Sampling")
+```
+
+Monte Carlo Simulation, Rejection Sampling mit Zielverteilung (Uniform)
+```{r}
+set.seed(14)
+n.sim <- 100000
+# Zielverteilung:
+fstar <- function(y) y * (1 - y) * (y + 1)
+m <- 0.4
+# Vorschlagsverteilung: Gleichverteilung auf [0,1]
+sample <- runif(n.sim) # y-Vorschläge
+u <- runif(n.sim) # y-Zufallswerte
+accepted <- u < fstar(sample) / m
+hist(sample, col="white", main="Alle Vorschläge")
+hist(sample[accepted], col="blue", add=TRUE)
+```
+
+Monte Carlo Simulation, Simulation von BMI und Adipositas, Zielverteilung bivariate Normalverteilung
+```{r}
+set.seed(14)
+library(mvtnorm)
+mu <- c(172, 70)
+sigma <- matrix(c(95,130,130,210), ncol=2)
+data <- rmvnorm(1000, mean=mu, sigma=sigma)
+data <- as.data.frame(data)
+names(data) <- c("height", "weight")
+data$BMI <- data$weight / (data$height/100)^2
+data$obese <- ifelse(data$BMI >= 30, 1, 0)
+mean(data$obese)
+```
+Monte Carlo Simulation, Visualisierung von gesunden BMI-Werten
+```{r}
+data$healthy <- ifelse(data$BMI >= 18.5 & data$BMI < 25, "yes", "no")
+plot(data$height, data$weight, col=ifelse(data$healthy=="yes", "green", "black"),
+     xlab="Height (cm)", ylab="Weight (kg)", pch=19)
+```
+
+Gibbs Sampling
+Bivariate (mvnorm) Normalverteilung mit Gibbs
+```{r, eval=FALSE}
+library(ellipse)
+gibbsNimate <- function(NSimul=50, rho=0.5, x0=1, y0=1) {
+  plot(ellipse(rho), type="l", main="Bivariate Normal", col="green")
+  x <- y <- numeric(NSimul)
+  x[1] <- x0; y[1] <- y0
+  for (b in 2:NSimul) {
+    x[b] <- rnorm(1, rho*y[b-1], sqrt(1 - rho^2))
+    y[b] <- rnorm(1, rho*x[b], sqrt(1 - rho^2))
+    points(x[b], y[b], col="red")
+  }
+  return(cbind(x, y))
+}
+gibbsNimate(50, rho=0.5)
+```
+
+Monte Carlo Simulation, um 1000 Werte aus einer Laplace-Verteilung mit Parametern μ=0, λ=1 zu erzeugen – mittels Rejection Sampling, wobei die t-Verteilung mit 1 Freiheitsgrad als Vorschlagsverteilung genutzt wird:
+```{r Laplace, eval=FALSE, include=FALSE}
+# png(file="solution.png")
+
+set.seed(14)
+n.sim <- 1000 
+fstar <- function(x) {
+  ifelse(x >= 0, exp(-x), exp(x))
+}
+x <- seq(-5, 5, length.out = 100)
+plot(x, fstar(x), type = "l", ylim = c(0, 1.2))
+lines(x, 3.5*dt(x, df = 1), col = "red")
+m <- 3.5
+f_Z <- function(x) {
+  dt(x, df = 1)
+}
+result <- rep(NA, n.sim)
+sample <- rep(NA, n.sim)
+for (i in 1:n.sim){
+  sample[i] <- rt(1, df = 1)
+  u <- runif(1) 
+  if (u < fstar(sample[i])/(m*f_Z(sample[i]))) 
+    result[i] <- sample[i]
+}
+result <- result[!is.na(result)]
+hist(sample, xlab = "y", main = "", col = "white")
+hist(result, add = TRUE, col = "darkblue") # not a nice plot
+# we remove the smallest and the largest values to get a better plot
+sample <- sample[sample >= min(result) & sample <= max(result)]
+hist(sample, xlab = "y", main = "", col = "white")
+hist(result, add = TRUE, col = "darkblue")
+require(ExtDist)
+plot(x, dlaplace(x, location = 0, scale = 1), type = "l")
+lines(density(result), col = "red")
+legend("topright", legend = c("truth", "smoothed empirical"),
+       lty = 1, col = c("black", "red"))
+	   
+# dev.off()
+```
+Schwarze Linie: Zielverteilung (Laplace)
+Rote Linie: Skalierte Vorschlagsverteilung 
+
+Plot a density of a standard normal random variable. Superimpose the density of a t-distribution with one degree of freedom in blue color. Vorbereitung für die Monte Carlo Simulation zur Angleichung t- an die Norm-distribution. 
+```{r}
+# 1. Create a fine grid of x–values
+x <- seq(-6, 6, length.out = 1000)
+
+# 2. Compute the standard Normal density
+# z <- dnorm(x, mean = 0, sd = 1)
+
+# 3. Plot the Normal density
+plot(x, dnorm(x, mean = 0, sd = 1), type ="l", lwd = 2, col= "black", ylim = c(0, max(dnorm(x, mean = 0, sd = 1), dt(x, df = 1))), ylab = "Density", xlab = "x", main = "Standard Normal vs. t(1) Density")
+
+# 4. Superimpose the t–distribution density with df = 1
+lines(x, dt(x, df = 1), col = "blue", lwd = 2, lty= 2)
+
+# 5. Add a legend
+legend("topright", legend = c("N(0,1)", "t(1)"), col = c("black", "blue"), lwd = 2, lty = c(1, 2))
+```
+
+Choose the degrees of freedom of a t-distribution such that the difference between
+its density and the one of a standard normal distribution is smaller than 0.001 in every location. Monte Carlo Simulation zur Angleichung t- an die Norm-distribution. 
+```{r}
+x <- seq(-6, 6, length.out = 1000)
+threshold <- 0.001
+
+for (df in 1:1000) {
+  # compute pointwise densities
+  norm_vals <- dnorm(x, mean = 0, sd = 1)
+  t_vals    <- dt(x, df = df)
+  
+  # sup‐norm distance
+  max_diff  <- max(abs(norm_vals - t_vals))
+  
+  if (max_diff < threshold) {
+    cat("Minimum df =", df, "with max difference =", max_diff, "\n")
+    break
+  }
+}
+```
+
+Monte Carlo Simulation zur Angleichung t- an die Norm-distribution, but with for loop:
+```{r}
+# Define the grid of degrees of freedom and the threshold
+df_vec    <- 1:1000
+threshold <- 0.001
+
+# Preallocate a vector to store the maximum density differences
+max_diffs <- numeric(length(df_vec))
+
+# Grid of x-values on which to compare the densities
+x <- seq(-6, 6, length.out = 1000)
+
+# Loop over all candidate df’s
+for (i in seq_along(df_vec)) {
+  df <- df_vec[i]
+  # Compute densities
+  norm_vals <- dnorm(x)
+  t_vals    <- dt(x, df = df)
+  # Compute sup‐norm distance and store it
+  max_diffs[i] <- max(abs(norm_vals - t_vals))
+}
+
+# Find the smallest df for which the difference is below the threshold
+result_df <- df_vec[which(max_diffs < threshold)[1]]
+
+# Output
+cat("Minimum df =", result_df, 
+    "with max difference =", round(max_diffs[which(max_diffs < threshold)[1]], 6), "\n")
+```
+
+
+--------------- design of experiments -------------------
+
+sample size n in a two-sided two sample t-test:
+```{r}
+power.t.test(delta=150/400, power=0.8,
+sig.level=0.05, alternative = "two.sided" )
+```
+
+sample size n in a two-sided two sample t-test, long version:
+```{r}
+sample_size_manual <- function(delta, alpha, one_minus_beta, sigma){
+z_a2 <- qnorm(1-alpha/2)
+z_b <- qnorm(one_minus_beta)
+n <- 2*(sigma*(z_a2+z_b)/delta)**2
+return(n)
+}
+sample_size_manual(delta=150,
+alpha=0.05,
+one_minus_beta=0.8, # = power
+sigma=400)
+```
+
+sample size n in a two-sided two sample z-test:
+```{r}
+# library(biostatUZH)
+# power.z.test(delta=150/400, power=0.8,
+# sig.level=0.05, alternative = "two.sided")
+```
+
+sample size n in a proportion example:
+```{r}
+power.prop.test(p1=0.2, p2=0.05, sig.level=0.05, power=0.95)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,1068 @@
+---
+title: "Detaillierte Analyse biologischer Dynamiken mit R"
+author: Tanja Rotondari
+date: Dezember 2024
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+# Einführung
+
+In der Lebenswissenschaft werden gewöhnliche Differentialgleichungen (ODEs) und stochastische Modelle häufig verwendet, um biologische und epidemiologische Prozesse zu modellieren. Dieses Dokument deckt eine breite Palette von Themen ab, darunter Vireninfektionen, Molekulardynamik, bakterielle Dynamiken und evolutionäre Prozesse. 
+
+### Themenübersicht
+1. Vireninfektionen (TI- und TIV-Modelle)
+2. Halbwertszeit und ideale ODE-Kurven
+3. Epidemiologie (SIR-Modell)
+4. Immunologie von Tuberkulose
+5. Mikrobiom-Dynamik
+6. Molekulare Epidemiologie
+7. Räumliche Epidemiologie
+8. Krebsentwicklung
+9. Virulenzentwicklung
+10. Bakterielle Dynamik innerhalb von Wirten
+11. Ressourcen-Konkurrenz und Spieltheorie
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(deSolve)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+
+---
+
+# 1. Vireninfektionen: TI- und TIV-Modelle
+
+### Beschreibung
+
+Das TI- und TIV-Modell beschreibt die Dynamik von Zielzellen (T), infizierten Zellen (I) und Viruspartikeln (V).
+
+```{r TI-TIV-Model}
+tiv_model <- function(t, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dT <- -beta * T * V
+    dI <- beta * T * V - delta * I
+    dV <- p * I - c * V
+    list(c(dT, dI, dV))
+  })
+}
+
+parameters <- c(beta = 0.001, delta = 0.1, p = 10, c = 0.1)
+state <- c(T = 1000, I = 1, V = 100)
+times <- seq(0, 50, by = 1)
+out <- ode(y = state, times = times, func = tiv_model, parms = parameters)
+out <- as.data.frame(out)
+
+ggplot(out, aes(x = time)) +
+  geom_line(aes(y = T, color = "Target Cells")) +
+  geom_line(aes(y = I, color = "Infected Cells")) +
+  geom_line(aes(y = V, color = "Virus Particles")) +
+  labs(title = "TIV-Modell", y = "Population", x = "Zeit", color = "Kategorien") +
+  theme_minimal()
+```
+```{r}
+library(deSolve)
+library(ggplot2)
+
+# Definition des TIV-Modells
+tiv_model <- function(t, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dT <- -beta * T * V
+    dI <- beta * T * V - delta * I
+    dV <- p * I - c * V
+    list(c(dT, dI, dV))
+  })
+}
+
+# Parameter vor der Behandlung
+parameters <- c(beta = 0.001, delta = 0.1, p = 10, c = 0.1)
+
+# Anfangszustände
+state <- c(T = 1000, I = 1, V = 100)
+
+# Zeitpunkte für die Simulation vor der Behandlung
+times_pre_treatment <- seq(0, 100, by = 1)
+
+# Simulation vor der Behandlung
+out_pre_treatment <- ode(y = state, times = times_pre_treatment, func = tiv_model, parms = parameters)
+out_pre_treatment <- as.data.frame(out_pre_treatment)
+
+# Parameter nach der Behandlung (antivirale Therapie)
+parameters_treatment <- parameters
+parameters_treatment["beta"] <- 0  # Virusinfektiösität wird durch Therapie eliminiert
+
+# Anfangszustände nach der Behandlung
+state_after_treatment <- c(
+  T = tail(out_pre_treatment$T, 1),
+  I = tail(out_pre_treatment$I, 1),
+  V = tail(out_pre_treatment$V, 1)
+)
+
+# Zeitpunkte für die Simulation nach der Behandlung
+times_post_treatment <- seq(100, 200, by = 1)
+
+# Simulation nach der Behandlung
+out_post_treatment <- ode(y = state_after_treatment, times = times_post_treatment, func = tiv_model, parms = parameters_treatment)
+out_post_treatment <- as.data.frame(out_post_treatment)
+
+# Ergebnisse kombinieren
+out_combined <- rbind(out_pre_treatment, out_post_treatment)
+
+# Plot
+ggplot(out_combined, aes(x = time)) +
+  geom_line(aes(y = T, color = "Target Cells"), size = 1) +
+  geom_line(aes(y = I, color = "Infected Cells"), size = 1) +
+  geom_line(aes(y = V, color = "Virus Particles"), size = 1) +
+  geom_vline(xintercept = 100, linetype = "dashed", color = "black", size = 1) +
+  labs(
+    title = "TIV-Modell mit antiviraler Behandlung",
+    y = "Population",
+    x = "Zeit",
+    color = "Kategorien"
+  ) +
+  theme_minimal()
+
+```
+
+---
+
+# 2. Halbwertszeit und ideale ODE-Kurven
+
+### Beschreibung
+
+Zerfallsprozesse lassen sich mit einer einfachen ODE modellieren.
+
+```{r Halbwertszeit}
+halflife_model <- function(t, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dA <- -k * A
+    list(c(dA))
+  })
+}
+
+parameters <- c(k = 0.05)
+state <- c(A = 100)
+times <- seq(0, 100, by = 1)
+out <- ode(y = state, times = times, func = halflife_model, parms = parameters)
+out <- as.data.frame(out)
+
+ggplot(out, aes(x = time, y = A)) +
+  geom_line(color = "blue") +
+  labs(title = "Halbwertszeit-Modell", y = "Konzentration", x = "Zeit") +
+  theme_minimal()
+```
+```{r}
+# 1. Allgemeine Funktion zur Berechnung der Halbwertszeit mit einem exponentiellen Modell
+halflife_analysis <- function(time, vV, initial_guess = c(I0 = 100, deltaI = 0.05)) {
+  # Funktion zur Berechnung der Summe der quadratischen Abweichungen (SSQ)
+  getSSQ <- function(parm) {
+    I0 <- parm[1]
+    deltaI <- parm[2]
+    yPredicted <- I0 * exp(-deltaI * time)
+    ssq <- sum((yPredicted - vV)^2, na.rm = TRUE)
+    return(ssq)
+  }
+  
+  # Optimierung der Parameter
+  fit <- optim(initial_guess, getSSQ, method = "L-BFGS-B", 
+               lower = c(0, 0), upper = c(Inf, Inf))
+  
+  # Ergebnisse extrahieren
+  I0_fit <- fit$par[1]
+  deltaI_fit <- fit$par[2]
+  half_life <- log(2) / deltaI_fit
+  
+  # Ausgabe der Ergebnisse
+  list(I0_fit = I0_fit, deltaI_fit = deltaI_fit, half_life = half_life, fit = fit)
+}
+
+# 2. Beispielwerte für Zeit und Viruslast (synthetische Daten)
+set.seed(123)
+time <- seq(0, 20, by = 1)
+true_I0 <- 100
+true_deltaI <- 0.1
+vV <- true_I0 * exp(-true_deltaI * time) + rnorm(length(time), mean = 0, sd = 5)
+
+# 3. Analyse durchführen
+result <- halflife_analysis(time, vV)
+
+# Ergebnisse anzeigen
+cat("Geschätzte Anfangsviruslast (I0):", round(result$I0_fit, 4), "\n")
+cat("Geschätzte Sterblichkeitsrate (deltaI):", round(result$deltaI_fit, 4), "\n")
+cat("Halbwertszeit der infizierten Zellen:", round(result$half_life, 2), "Tage\n")
+
+# 4. Plot der Ergebnisse
+plot(time, vV, main = "Halbwertszeit-Analyse", 
+     xlab = "Zeit", ylab = "Konzentration", pch = 16, col = "black")
+curve(result$I0_fit * exp(-result$deltaI_fit * x), 
+      from = min(time), to = max(time), add = TRUE, col = "red")
+legend("topright", legend = c("Daten", "Fit"), col = c("black", "red"), 
+       pch = c(16, NA), lty = c(NA, 1), cex = 0.8)
+
+```
+
+
+---
+
+# 3. Epidemiologie: Beobachtungsdaten und SEIR-Modell
+
+### Beschreibung
+
+SEIR-Funktion:
+Simuliert die Dynamik basierend auf biologischen und sozialen Parametern.
+Beinhaltet die Übertragungsrate beta, die nach Einführung von Kontrollmaßnahmen exponentiell abklingt.
+Unterstützt Emigration durch einen festen Prozentsatz der anfälligen/exponierten Personen.
+Parameter:
+beta0, sigma, gamma und f beschreiben die Krankheitsdynamik.
+tau1 ist der Zeitpunkt, an dem Maßnahmen eingeführt werden.
+emigration_rate simuliert den Effekt von Bevölkerungsbewegungen.
+Startwerte:
+Definieren die anfängliche Population in jedem Kompartiment (S, E, I, R, D, C).
+Simulation:
+Berechnet den Verlauf der Epidemie über 180 Tage in täglichen Schritten.
+Plot:
+Visualisiert die Entwicklung der verschiedenen Kompartimente im Zeitverlauf (S, E, I, R, D).
+Ergebnis:
+Der Code simuliert eine Epidemie mit Kontrollmaßnahmen (Tag 30) und Emigration. Er zeigt, wie sich die Krankheitsdynamik über die Zeit verändert und wie sich die Kontrollmaßnahmen auswirken.
+
+```{r SEIR-Model}
+# Laden der erforderlichen Bibliotheken
+library(deSolve)
+library(ggplot2)
+
+# SEIR-Modell-Definition
+# Diese Funktion beschreibt die Dynamik des SEIR-Modells mit optionaler Emigration
+SEIR_with_emigration <- function(t, x, parms) {
+  with(as.list(c(parms, x)), {
+    # Übertragungsrate (Beta) ist vor und nach dem Zeitpunkt tau1 unterschiedlich
+    if (t < tau1) {
+      beta <- beta0  # Konstante Übertragungsrate vor den Kontrollmaßnahmen
+    } else {
+      beta <- beta0 * exp(-k * (t - tau1))  # Exponentielles Abklingen nach tau1
+    }
+    
+    # Gesamtpopulation berechnen
+    N <- S + E + I + R
+
+    # Änderung der Populationen durch Emigration und Krankheitsdynamik
+    dS <- -beta * S * I / N - emigration_rate * S  # Abnahme der anfälligen Personen
+    dE <- beta * S * I / N - sigma * E - emigration_rate * E  # Veränderung der exponierten Personen
+    dI <- sigma * E - gamma * I  # Infizierte Personen
+    dR <- (1 - f) * gamma * I  # Genesene Personen
+    dD <- f * gamma * I  # Tote Personen
+    dC <- sigma * E  # Kumulative Fälle
+
+    # Rückgabe der Ableitungen
+    list(c(dS, dE, dI, dR, dD, dC))
+  })
+}
+
+# Parameter festlegen
+pars <- list(
+  beta0 = 0.4,          # Initiale Übertragungsrate
+  sigma = 1 / 5.2,      # Übergang von E zu I (ca. 5 Tage Inkubationszeit)
+  gamma = 1 / 2.9,      # Genesungsrate (ca. 2,9 Tage bis Genesung oder Tod)
+  f = 0.02,             # Sterberate (2 %)
+  k = 0.1,              # Abklingrate der Übertragungsrate
+  tau1 = 30,            # Zeitpunkt der Einführung von Maßnahmen (Tag 30)
+  emigration_rate = 0.01 # Emigrationsrate (1 % der anfälligen/exponierten Personen pro Tag)
+)
+
+# Startwerte festlegen
+init <- c(
+  S = 1e6 - 10,  # Anfängliche anfällige Personen (Population: 1.000.000)
+  E = 10,        # Anfänglich exponierte Personen
+  I = 0,         # Keine anfänglich infizierten Personen
+  R = 0,         # Keine anfänglich genesenen Personen
+  D = 0,         # Keine anfänglichen Todesfälle
+  C = 10         # Anfänglich kumulative Fälle
+)
+
+# Zeitschritte definieren
+timepoints <- seq(0, 180, by = 1)  # Simulationszeitraum: 180 Tage
+
+# Simulation durchführen
+simulation <- as.data.frame(ode(y = init, times = timepoints, func = SEIR_with_emigration, parms = pars))
+
+# Simulation visualisieren
+ggplot(simulation, aes(x = time)) +
+  geom_line(aes(y = S, color = "Susceptible")) +
+  geom_line(aes(y = E, color = "Exposed")) +
+  geom_line(aes(y = I, color = "Infected")) +
+  geom_line(aes(y = R, color = "Recovered")) +
+  geom_line(aes(y = D, color = "Dead")) +
+  labs(
+    title = "SEIR Model Dynamics",
+    x = "Time (days)",
+    y = "Population",
+    color = "Compartment"
+  ) +
+  theme_classic()
+```
+----
+
+Hier ist eine angepasste Version des SEIR-Models, das einen initialen Ausbruch simuliert und nach 30 Tagen die Einführung von Maßnahmen (z. B. Impfung) integriert. Diese Maßnahmen reduzieren die Anzahl der anfälligen Personen (S) und bewirken einen Rückgang der Infektionen.
+
+```{r}
+# Laden der erforderlichen Bibliotheken
+library(deSolve)
+library(ggplot2)
+
+# SEIR-Modell mit Maßnahmen (Impfung)
+SEIR_with_vaccination <- function(t, x, parms) {
+  with(as.list(c(parms, x)), {
+    # Übertragungsrate (Beta) ändert sich mit der Zeit
+    if (t < tau1) {
+      beta <- beta0  # Konstante Übertragungsrate vor Maßnahmen
+    } else {
+      beta <- beta0 * exp(-k * (t - tau1))  # Exponentielles Abklingen nach Maßnahmen
+    }
+
+    # Effekt der Impfung (ab Tag tau1)
+    vaccine_effect <- ifelse(t >= tau1, vaccine_rate * S, 0)
+
+    # Gesamtpopulation berechnen
+    N <- S + E + I + R
+
+    # Änderung der Populationen
+    dS <- -beta * S * I / N - vaccine_effect  # Anfällige Personen verringern sich durch Infektion und Impfung
+    dE <- beta * S * I / N - sigma * E        # Exponierte Personen
+    dI <- sigma * E - gamma * I               # Infizierte Personen
+    dR <- gamma * I + vaccine_effect          # Genesene Personen erhöhen sich durch Impfung
+    dD <- f * gamma * I                       # Tote Personen
+    dC <- sigma * E                           # Kumulative Fälle
+
+    # Rückgabe der Ableitungen
+    list(c(dS, dE, dI, dR, dD, dC))
+  })
+}
+
+# Parameter festlegen
+pars <- list(
+  beta0 = 0.6,          # Initiale Übertragungsrate
+  sigma = 1 / 5.2,      # Übergang von E zu I (ca. 5 Tage Inkubationszeit)
+  gamma = 1 / 2.9,      # Genesungsrate (ca. 2,9 Tage bis Genesung oder Tod)
+  f = 0.02,             # Sterberate (2 %)
+  k = 0.1,              # Abklingrate der Übertragungsrate
+  tau1 = 30,            # Zeitpunkt der Einführung von Maßnahmen (Tag 30)
+  vaccine_rate = 0.02   # Impfquote (2 % der anfälligen Personen pro Tag)
+)
+
+# Startwerte festlegen
+init <- c(
+  S = 1e6 - 50,  # Anfängliche anfällige Personen (Population: 1.000.000)
+  E = 30,        # Anfänglich exponierte Personen
+  I = 20,        # Anfänglich infizierte Personen
+  R = 0,         # Keine anfänglich genesenen Personen
+  D = 0,         # Keine anfänglichen Todesfälle
+  C = 50         # Anfänglich kumulative Fälle
+)
+
+# Zeitschritte definieren
+timepoints <- seq(0, 180, by = 1)  # Simulationszeitraum: 180 Tage
+
+# Simulation durchführen
+simulation <- as.data.frame(ode(y = init, times = timepoints, func = SEIR_with_vaccination, parms = pars))
+
+# Simulation visualisieren
+ggplot(simulation, aes(x = time)) +
+  geom_line(aes(y = S, color = "Susceptible")) +
+  geom_line(aes(y = E, color = "Exposed")) +
+  geom_line(aes(y = I, color = "Infected")) +
+  geom_line(aes(y = R, color = "Recovered")) +
+  geom_line(aes(y = D, color = "Dead")) +
+  labs(
+    title = "SEIR Model with Vaccination",
+    x = "Time (days)",
+    y = "Population",
+    color = "Compartment"
+  ) +
+  theme_classic()
+
+```
+
+----
+
+# 4. Systeme: Immunologie bei Tuberkulose
+# Komplexe Immunantworten bei Tuberkulose können mit ODEs modelliert werden.
+
+```{r Tuberculosis-Immunology, Heatmap: TB versus healthy}
+# Beispiel für eine Heatmap: TB vs. Healthy
+library(ggplot2)
+library(reshape2)
+
+# Dummy-Daten generieren
+set.seed(123)
+data <- matrix(rnorm(100), nrow = 10, ncol = 10)
+rownames(data) <- paste0("Gene", 1:10)
+colnames(data) <- c(rep("Healthy", 5), rep("TB", 5))
+
+# Daten in ein langes Format bringen
+data_long <- melt(data)
+colnames(data_long) <- c("Gene", "Patient", "Expression")
+
+# Heatmap plotten
+ggplot(data_long, aes(Patient, Gene, fill = Expression)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  theme_minimal() +
+  labs(x = "Patient Group", y = "Genes", fill = "Expression") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+Vulcanoplot: TB versus healthy
+```{r, Vulcanoplot: TB versus healthy}
+# Notwendige Bibliothek installieren und laden
+if (!requireNamespace("ggplot2", quietly = TRUE)) install.packages("ggplot2")
+library(ggplot2)
+
+# Simulierte Daten erzeugen
+set.seed(123)
+n <- 1000  # Anzahl der Punkte
+lfc <- rnorm(n, mean = 0, sd = 1.5)  # Log2 Fold Change
+pval <- runif(n, min = 0, max = 0.05)  # p-Werte
+log_pval <- -log10(pval)  # -log10(p-value)
+
+# Daten als DataFrame
+data <- data.frame(
+  LFC = lfc,
+  pval = pval,
+  log_pval = log_pval,
+  Significant = ifelse(abs(lfc) > 1 & pval < 0.05, "Significant", "Not Significant")
+)
+
+# Punkte mit LFC = 0 oder log_pval = 0 entfernen
+data <- subset(data, LFC != 0 & log_pval > 0)
+
+# Volcano-Plot
+ggplot(data, aes(x = LFC, y = log_pval, color = Significant)) +
+  geom_point(alpha = 0.8, size = 2) +
+  scale_color_manual(values = c("Significant" = "red", "Not Significant" = "grey")) +
+  theme_minimal() +
+  ggtitle("Volcano Plot of Gene Sets/functional Genes concerning Tuberculosis") +
+  xlab("Log2 Fold Change") +
+  ylab("-Log10(p-value)") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "blue") +
+  geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "blue") +
+  theme(
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 12)
+  )
+```
+
+
+PCA, TB versus healthy
+```{r, PCA, TB versus healthy}
+# Beispiel für einen PCA-Plot: TB vs. Healthy mit mehr Überlappung
+library(ggplot2)
+
+# Dummy-Daten generieren
+set.seed(123)
+
+# Unterschiedliche Datenmuster für TB und Healthy mit größerer Überlappung
+healthy_data <- matrix(rnorm(100, mean = 0.1, sd = 1.0), nrow = 10, ncol = 10)
+tb_data <- matrix(rnorm(100, mean = -0.1, sd = 1.0), nrow = 10, ncol = 10)
+
+# Daten kombinieren
+data <- rbind(healthy_data, tb_data)
+rownames(data) <- paste0("Sample", 1:20)
+colnames(data) <- paste0("Gene", 1:10)
+
+# Gruppenzuordnung
+group <- factor(c(rep("Healthy", 10), rep("TB", 10)))
+
+# PCA durchführen
+pca <- prcomp(data, scale. = TRUE)
+pca_data <- as.data.frame(pca$x)
+pca_data$Group <- group
+
+# PCA plotten
+ggplot(pca_data, aes(x = PC1, y = PC2, color = Group)) +
+  geom_point(size = 4, alpha = 0.7) +
+  theme_minimal() +
+  labs(x = paste0("PC1 (", round(100 * summary(pca)$importance[2, 1], 1), "% Varianz)"),
+       y = paste0("PC2 (", round(100 * summary(pca)$importance[2, 2], 1), "% Varianz)"),
+       color = "Group", title = "PCA: TB vs. Healthy with Stronger Overlap") +
+  theme(legend.position = "bottom")
+```
+
+---
+
+# 6. Räumliche Epidemiologie
+
+### Beschreibung
+Das Modell beschreibt die Ausbreitung von Infektionskrankheiten unter Berücksichtigung räumlicher Interaktionen.
+
+```{r SpatialEpidemiology}
+spatial_model <- function(t, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dS <- -beta * S * I
+    dI <- beta * S * I - gamma * I
+    dR <- gamma * I
+    list(c(dS, dI, dR))
+  })
+}
+
+parameters <- c(beta = 0.3, gamma = 0.1)
+state <- c(S = 999, I = 1, R = 0)
+times <- seq(0, 100, by = 1)
+out <- ode(y = state, times = times, func = spatial_model, parms = parameters)
+out <- as.data.frame(out)
+
+ggplot(out, aes(x = time)) +
+  geom_line(aes(y = S, color = "Susceptible")) +
+  geom_line(aes(y = I, color = "Infected")) +
+  geom_line(aes(y = R, color = "Recovered")) +
+  labs(title = "Räumliche Epidemiologie", y = "Population", x = "Zeit", color = "Kategorien") +
+  theme_minimal()
+```
+
+---
+
+# 7. Krebsentwicklung
+
+### Beschreibung
+Dieses Modell simuliert die Dynamik von Tumorzellen und gesunden Zellen.
+
+```{r CancerEvolution}
+cancer_model <- function(t, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dH <- rH * H * (1 - (H + T) / K)
+    dT <- rT * T * (1 - (H + T) / K) - dT * T
+    list(c(dH, dT))
+  })
+}
+
+parameters <- c(rH = 0.05, rT = 0.02, dT = 0.01, K = 1000)
+state <- c(H = 800, T = 50)
+times <- seq(0, 200, by = 1)
+out <- ode(y = state, times = times, func = cancer_model, parms = parameters)
+out <- as.data.frame(out)
+
+ggplot(out, aes(x = time)) +
+  geom_line(aes(y = H, color = "Gesunde Zellen")) +
+  geom_line(aes(y = T, color = "Tumorzellen")) +
+  labs(title = "Krebsentwicklung", y = "Population", x = "Zeit", color = "Kategorien") +
+  theme_minimal()
+```
+
+---
+
+# 8. Virulenzentwicklung
+
+### Beschreibung
+Modelliert die Evolution der Virulenz in einer Pathogenpopulation.
+
+```{r}
+# Generalisierte R-Vorlage für Fitness und Phylogenie
+
+# Notwendige Pakete installieren und laden
+if (!requireNamespace("ggplot2", quietly = TRUE)) install.packages("ggplot2")
+if (!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
+if (!requireNamespace("ape", quietly = TRUE)) install.packages("ape")
+library(ggplot2)
+library(dplyr)
+library(ape)
+
+# Sicherstellen, dass alle offenen Geräte geschlossen sind
+while (!is.null(dev.list())) dev.off()
+
+# Layout für 4 Plots untereinander definieren
+par(mfrow = c(4, 1), mar = c(4, 4, 2, 1))  # Layout für 4 Zeilen, angepasste Ränder
+
+####### TEIL 1: FITNESS #######
+
+# Aufgabe 1: Beziehung zwischen Viruslast und Übertragungsrate
+set.seed(123)
+viruslast <- seq(1, 7, by = 0.1)
+uebertragungsrate <- exp(-((viruslast - 4)^2))
+
+# Plot 1: Viruslast und Übertragungsrate
+plot(viruslast, uebertragungsrate, type = "l", col = "blue", lwd = 2,
+     xlab = "Log10 Viruslast", ylab = "Übertragungsrate",
+     main = "Beziehung zwischen Viruslast und Übertragungsrate")
+
+# Definiere den Punkt, der hervorgehoben werden soll
+highlight_x <- 4.4
+highlight_y <- exp(-((highlight_x - 4)^2))
+
+# Füge den Punkt hinzu
+points(highlight_x, highlight_y, col = "red", pch = 19)
+
+# Beschrifte den Punkt
+text(highlight_x, highlight_y, labels = paste0("(", highlight_x, ", ", round(highlight_y, 2), ")"),
+     pos = 4, col = "red")
+
+# Aufgabe 2: Beziehung zwischen Viruslast und Zeit bis AIDS
+zeit_bis_aids <- 20 - 3 * (viruslast - 4)^2
+zeit_bis_aids[zeit_bis_aids < 0] <- 0
+
+# Plot 2: Zeit bis AIDS
+plot(viruslast, zeit_bis_aids, type = "l", col = "green", lwd = 2,
+     xlab = "Log10 Viruslast", ylab = "Zeit bis AIDS (Jahre)",
+     main = "Beziehung zwischen Viruslast und Zeit bis AIDS")
+
+# Hervorheben eines spezifischen Punktes
+highlight_y_aids <- 20 - 3 * (highlight_x - 4)^2
+points(highlight_x, highlight_y_aids, col = "red", pch = 19)
+text(highlight_x, highlight_y_aids, labels = paste0("(", highlight_x, ", ", round(highlight_y_aids, 2), ")"),
+     pos = 4, col = "red")
+
+# Aufgabe 3: Fitness
+fitness <- uebertragungsrate * zeit_bis_aids
+
+# Plot 3: Fitness
+plot(viruslast, fitness, type = "l", col = "purple", lwd = 2,
+     xlab = "Log10 Viruslast", ylab = "Fitness",
+     main = "Beziehung zwischen Viruslast und Fitness")
+
+# Hervorheben des optimalen Punktes
+optimal_index <- which.max(fitness)
+optimal_x <- viruslast[optimal_index]
+optimal_y <- fitness[optimal_index]
+points(optimal_x, optimal_y, col = "red", pch = 19)
+text(optimal_x, optimal_y, labels = paste0("Optimum: ", round(optimal_x, 2)), pos = 4, col = "red")
+
+####### TEIL 2: PHYLOGENIE #######
+
+# Beispiel-Baum erstellen (z. B. wenn keine Datei vorhanden ist)
+tree_spvl <- rtree(20)  # Zufälligen phylogenetischen Baum generieren
+
+# Plot 4: Phylogenetischer Baum
+plot(tree_spvl, main = "Phylogenetischer Baum", cex = 0.8)
+```
+
+---
+
+# 9. Ressourcen-Konkurrenz und Spieltheorie
+
+### Beschreibung
+Modelliert die Konkurrenz um Ressourcen in einer Spieltheorie-basierten Umgebung.
+
+```{r ResourceCompetition}
+competition_model <- function(t, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dA <- rA * A * (1 - (A + B) / K)
+    dB <- rB * B * (1 - (A + B) / K)
+    list(c(dA, dB))
+  })
+}
+
+parameters <- c(rA = 0.05, rB = 0.03, K = 1000)
+state <- c(A = 500, B = 300)
+times <- seq(0, 200, by = 1)
+out <- ode(y = state, times = times, func = competition_model, parms = parameters)
+out <- as.data.frame(out)
+
+ggplot(out, aes(x = time)) +
+  geom_line(aes(y = A, color = "Population A")) +
+  geom_line(aes(y = B, color = "Population B")) +
+  labs(title = "Ressourcen-Konkurrenz und Spieltheorie", y = "Population", x = "Zeit", color = "Kategorien") +
+  theme_minimal()
+```
+
+---
+
+# 10. Molekulare Epidemiologie
+
+### Beschreibung
+Dieses Modell untersucht die Wechselwirkung zwischen zwei molekularen Spezies in einem epidemiologischen Kontext.
+
+```{r MolecularEpidemiology}
+molecular_model <- function(t, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dX <- a * X - b * X * Y
+    dY <- c * X * Y - d * Y
+    list(c(dX, dY))
+  })
+}
+
+parameters <- c(a = 0.05, b = 0.02, c = 0.03, d = 0.01)
+state <- c(X = 50, Y = 20)
+times <- seq(0, 200, by = 1)
+out <- ode(y = state, times = times, func = molecular_model, parms = parameters)
+out <- as.data.frame(out)
+
+ggplot(out, aes(x = time)) +
+  geom_line(aes(y = X, color = "Spezies X")) +
+  geom_line(aes(y = Y, color = "Spezies Y")) +
+  labs(title = "Molekulare Epidemiologie", y = "Konzentration", x = "Zeit", color = "Spezies") +
+  theme_minimal()
+```
+
+---
+
+# 11. Molekulardynamik
+
+```{r MolecularDynamics}
+molecular_dynamics <- function(t, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dX <- -k1 * X + k2 * Y
+    dY <- k1 * X - k2 * Y
+    list(c(dX, dY))
+  })
+}
+
+parameters <- c(k1 = 0.02, k2 = 0.01)
+state <- c(X = 50, Y = 30)
+times <- seq(0, 100, by = 1)
+out <- ode(y = state, times = times, func = molecular_dynamics, parms = parameters)
+out <- as.data.frame(out)
+
+ggplot(out, aes(x = time)) +
+  geom_line(aes(y = X, color = "Molekül X")) +
+  geom_line(aes(y = Y, color = "Molekül Y")) +
+  labs(title = "Molekulardynamik", y = "Konzentration", x = "Zeit", color = "Moleküle") +
+  theme_minimal()
+```
+
+---
+
+# Fazit
+
+Dieses Dokument illustriert die Vielfalt von ODE-basierten Modellen für lebenswissenschaftliche Anwendungen. Jedes Thema kann für spezifische Anwendungen erweitert werden.
+
+----
+
+scale free network (wie zB das Internet oder soziale Beziehungen)
+
+```{r}
+library(igraph)
+
+# Parameters for the scale-free network
+N <- 100           # Total number of nodes
+m0 <- 3            # Initial number of nodes
+m <- 2             # Number of edges added per new node
+
+# Generate a scale-free network using the Barabási-Albert model
+scale_free_network <- sample_pa(n = N, power = 1, m = m, directed = FALSE)
+
+# Ensure plots are displayed
+par(mfrow = c(1, 1))  # Reset plotting area to a single panel
+
+# Plot the network
+plot(scale_free_network, vertex.size = 5, vertex.label = NA, main = "Scale-Free Network")
+
+# Degree distribution
+degree_distribution <- degree(scale_free_network)
+hist(degree_distribution, breaks = 10, main = "Degree Distribution", xlab = "Degree", ylab = "Frequency")
+
+# Log-log plot of the degree distribution
+degree_counts <- table(degree_distribution)
+plot(as.numeric(names(degree_counts)), degree_counts, log = "xy",
+     xlab = "Degree (log scale)", ylab = "Frequency (log scale)",
+     main = "Log-Log Plot of Degree Distribution", pch = 19, col = "blue")
+
+```
+
+
+-----
+
+preferential attachment
+
+```{r}
+# Initialize parameters
+N <- 100          # Total number of nodes
+m0 <- 3           # Initial number of nodes
+m <- 2            # Number of edges added per new node
+
+# Start with a small fully connected network
+adjacency_matrix <- matrix(0, nrow = N, ncol = N)
+for (i in 1:m0) {
+  for (j in (i + 1):m0) {
+    adjacency_matrix[i, j] <- 1
+    adjacency_matrix[j, i] <- 1
+  }
+}
+
+# Add new nodes with preferential attachment
+for (new_node in (m0 + 1):N) {
+  # Calculate the degree of each existing node
+  degrees <- rowSums(adjacency_matrix[1:(new_node - 1), 1:(new_node - 1)])
+  
+  # Calculate connection probabilities
+  prob <- degrees / sum(degrees)
+  
+  # Ensure no invalid probabilities
+  if (any(is.na(prob)) || sum(prob) == 0) {
+    prob <- rep(1 / length(degrees), length(degrees))
+  }
+  
+  # Choose `m` nodes to connect to, based on probabilities
+  connected_nodes <- sample(1:(new_node - 1), m, replace = FALSE, prob = prob)
+  
+  # Add connections to the adjacency matrix
+  for (node in connected_nodes) {
+    adjacency_matrix[new_node, node] <- 1
+    adjacency_matrix[node, new_node] <- 1
+  }
+}
+
+# Convert to an igraph object
+library(igraph)
+network <- graph_from_adjacency_matrix(adjacency_matrix, mode = "undirected")
+
+# Plot the network
+plot(network, vertex.size = 5, vertex.label = NA, main = "Scale-Free Network (Preferential Attachment)")
+
+# Plot degree distribution
+degree_distribution <- degree(network)
+hist(degree_distribution, breaks = 10, main = "Degree Distribution", xlab = "Degree", ylab = "Frequency")
+
+```
+
+Eine ODE ist ein deterministisches Modell, und ein stochastisches Modell wird zur Simulation gebraucht.
+
+Stimmt teilweise.
+ODEs (Ordinary Differential Equations) sind deterministische Modelle, die den zeitlichen Verlauf eines Systems anhand von Ableitungen und festen Gleichungen beschreiben. Es gibt keine Zufallselemente in ODEs; für gegebene Anfangsbedingungen liefert das Modell immer die gleichen Ergebnisse.
+Stochastische Modelle hingegen berücksichtigen Zufallselemente, um Unsicherheiten und Variabilitäten im System zu modellieren. Diese sind oft besser geeignet, um Systeme zu simulieren, die von zufälligen Ereignissen beeinflusst werden (z. B. Übertragungen in einer Population mit niedriger Dichte).
+Unterschiede zwischen deterministischen und stochastischen SEIR-Modellen
+Deterministisches SEIR-Modell (ODE-basiert):
+Verwendet Differentialgleichungen, um die Flussraten zwischen den Populationen S (Susceptible), E (Exposed), I (Infectious), und R (Recovered) zu berechnen.
+Ergebnis: Glatte Kurven für S, E, I und R.
+Stochastisches SEIR-Modell:
+Simuliert zufällige Ereignisse (z. B. wann eine Übertragung oder ein Übergang stattfindet).
+Ergebnis: Variabilität in den Trajektorien der Populationen aufgrund von Zufallsprozessen.
+
+```{r}
+# ODE-Modell für SEIR
+
+library(deSolve)
+
+# SEIR-Modellgleichungen
+seir_ode <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dS <- -beta * S * I / N
+    dE <- beta * S * I / N - sigma * E
+    dI <- sigma * E - gamma * I
+    dR <- gamma * I
+    
+    # Rückgabe der Ableitungen
+    list(c(dS, dE, dI, dR))
+  })
+}
+
+# Anfangsbedingungen
+state <- c(S = 999, E = 1, I = 0, R = 0)
+
+# Parameter
+parameters <- c(
+  beta = 0.3,  # Übertragungsrate
+  sigma = 1/5, # Rate von Exposed zu Infectious
+  gamma = 1/10 # Genesungsrate
+)
+
+# Zeitintervall
+time <- seq(0, 100, by = 1)
+
+# Lösen der ODE
+output <- ode(y = state, times = time, func = seir_ode, parms = parameters)
+
+# Daten in ein DataFrame umwandeln
+output_df <- as.data.frame(output)
+
+# Plot
+plot(output_df$time, output_df$S, type = "l", col = "blue", ylim = c(0, 1000),
+     xlab = "Zeit", ylab = "Population", main = "SEIR-Modell")
+lines(output_df$time, output_df$E, col = "orange")
+lines(output_df$time, output_df$I, col = "red")
+lines(output_df$time, output_df$R, col = "green")
+legend("right", legend = c("S", "E", "I", "R"), col = c("blue", "orange", "red", "green"), lwd = 2, cex=0.8)
+```
+
+```{r}
+# Stochastisches SEIR-Modell
+# Stochastisches SEIR-Modell
+library(ggplot2)
+library(tidyr)  # Für pivot_longer
+
+# Parameter und Anfangsbedingungen
+N <- 1000       # Gesamtbevölkerung
+beta <- 0.3     # Übertragungsrate
+sigma <- 1 / 5  # Übergang von Exposed zu Infectious
+gamma <- 1 / 10 # Genesungsrate
+time_steps <- 100  # Simulationszeit
+state <- c(S = 999, E = 1, I = 0, R = 0)  # Startpopulationen
+
+# Leerer DataFrame für Ergebnisse
+results <- data.frame(
+  time = 0:time_steps,
+  S = numeric(time_steps + 1),
+  E = numeric(time_steps + 1),
+  I = numeric(time_steps + 1),
+  R = numeric(time_steps + 1)
+)
+
+# Initiale Werte speichern
+results[1, ] <- c(0, state)
+
+# Simulationsschleife
+for (t in 1:time_steps) {
+  S <- state["S"]
+  E <- state["E"]
+  I <- state["I"]
+  R <- state["R"]
+  
+  # Übergänge simulieren (stochastisch)
+  new_infected <- rbinom(1, S, 1 - exp(-beta * I / N))   # S -> E
+  new_exposed <- rbinom(1, E, 1 - exp(-sigma))          # E -> I
+  new_recovered <- rbinom(1, I, 1 - exp(-gamma))        # I -> R
+  
+  # Zustände aktualisieren mit Grenzbedingungen
+  S <- max(S - new_infected, 0)
+  E <- max(E + new_infected - new_exposed, 0)
+  I <- max(I + new_exposed - new_recovered, 0)
+  R <- min(R + new_recovered, N)  # Sicherstellen, dass R nicht über N hinausgeht
+  
+  # Ergebnisse speichern
+  state <- c(S = S, E = E, I = I, R = R)
+  results[t + 1, ] <- c(t, state)
+}
+
+# Daten in ein langes Format umwandeln für ggplot
+results_long <- results %>%
+  pivot_longer(cols = c("S", "E", "I", "R"), names_to = "variable", values_to = "value")
+
+# Plot erstellen
+ggplot(results_long, aes(x = time, y = value, color = variable)) +
+  geom_line(size = 1) +
+  labs(
+    title = "Stochastisches SEIR-Modell",
+    x = "Zeit",
+    y = "Population",
+    color = "Variable"
+  ) +
+  theme_minimal() +
+  scale_color_manual(
+    values = c("blue", "orange", "red", "green"),
+    labels = c("Susceptible (S)", "Exposed (E)", "Infected (I)", "Recovered (R)")
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.title = element_blank()
+  )
+```
+
+### **Monte Carlo Simulation**
+
+Eine **Monte Carlo Simulation** ist eine Methode, bei der Zufallszahlen genutzt werden, um Modelle mit Unsicherheiten oder stochastischen Elementen zu simulieren. Dabei werden viele Simulationen (sogenannte "Realisierungen") durchgeführt, um ein breites Spektrum möglicher Ergebnisse zu erhalten. 
+
+**Zentrale Eigenschaften:**
+1. **Stochastisch:** Zufallselemente spielen eine zentrale Rolle.
+2. **Wiederholungen:** Das Modell wird tausendfach (oder mehr) mit zufälligen Variablen simuliert.
+3. **Statistische Auswertung:** Ergebnisse werden in Wahrscheinlichkeitsverteilungen, Konfidenzintervallen oder Erwartungswerten zusammengefasst.
+
+**Beispiele für Monte Carlo Simulationen:**
+- **Epidemiologie:** Simulieren der möglichen Ausbreitung eines Virus unter stochastischen Bedingungen.
+- **Finanzen:** Vorhersage von Aktienkursen oder Risikomodellen.
+- **Physik:** Modellierung von Zufallsbewegungen (z. B. Brownsche Bewegung).
+
+---
+
+### **Zusammenhang zwischen Systemstabilität und Trajektorien**
+
+1. **Stabile Systeme:**
+   - Haben **glatte Trajektorien**, wenn sie nach einer Störung zurück zu einem stabilen Gleichgewichtszustand finden.
+   - Beispiel: Ein gedämpfter Schwinger kehrt nach einer kleinen Auslenkung zur Ruhe zurück.
+
+2. **Instabile Systeme:**
+   - Zeigen oft **Oszillationen**, die sich entweder verstärken oder auf Dauer erhalten bleiben.
+   - Beispiel: Ein ungedämpfter Schwinger oszilliert unendlich weiter, oder ein überdämpftes System verstärkt Störungen.
+
+3. **Untergehende Systeme:**
+   - Systeme, die sich unkontrolliert von stabilen Zuständen entfernen, können **chaotisches Verhalten** zeigen.
+   - Chaos bedeutet:
+     - Unvorhersagbare, aber deterministische Dynamik.
+     - Sensitivität auf Anfangsbedingungen.
+   - Beispiel: Wettersysteme, die auf kleinste Veränderungen in den Anfangsbedingungen stark reagieren (Schmetterlingseffekt).
+
+---
+
+### **Zusammenhänge im Detail**
+
+| **Systemtyp**         | **Charakteristik der Trajektorien** | **Beispiele**                              |
+|------------------------|-------------------------------------|--------------------------------------------|
+| **Stabil**            | Glatte Trajektorie, kehrt zum Gleichgewicht zurück | Gedämpfter Schwinger, SEIR-Modell mit Immunität |
+| **Instabil**          | Oszillationen oder Divergenz         | Ungedämpfter Schwinger, Epidemien ohne Kontrolle |
+| **Chaotisch**         | Komplexes, scheinbar zufälliges Verhalten | Wettersysteme, Logistische Gleichung mit \( r > 3.57 \) |
+
+---
+
+### **Fazit zur Stabilität**
+- **Ja**, stabile Systeme haben oft glatte Trajektorien, da sie zur Balance tendieren.
+- **Ja**, instabile Systeme können Oszillationen zeigen, besonders bei Rückkopplungen.
+- **Ja**, untergehende oder chaotische Systeme zeigen oft komplexes, nicht vorhersehbares Verhalten.
+
+```{r}
+# Gedämpfte Schwingung mit Differentialgleichung
+library(deSolve)
+
+damped_oscillator <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dx <- v
+    dv <- -k * x - c * v  # Kraft: Rückstellkraft und Dämpfung
+    list(c(dx, dv))
+  })
+}
+
+# Parameter und Anfangswerte
+parameters <- c(k = 1, c = 0.2)  # Federkonstante und Dämpfung
+state <- c(x = 1, v = 0)  # Anfangsauslenkung und Geschwindigkeit
+times <- seq(0, 20, by = 0.1)
+
+# Simulation
+output <- ode(y = state, times = times, func = damped_oscillator, parms = parameters)
+
+# Plot
+output_df <- as.data.frame(output)
+plot(output_df$time, output_df$x, type = "l", col = "blue", lwd = 2,
+     xlab = "Zeit", ylab = "Auslenkung x",
+     main = "Stabiles System: Gedämpfte Schwingung")
+```
+
+```{r}
+# Ungedämpfte Schwingung
+parameters <- c(k = 1, c = 0)  # Keine Dämpfung
+
+# Simulation
+output <- ode(y = state, times = times, func = damped_oscillator, parms = parameters)
+
+# Plot
+output_df <- as.data.frame(output)
+plot(output_df$time, output_df$x, type = "l", col = "red", lwd = 2,
+     xlab = "Zeit", ylab = "Auslenkung x",
+     main = "Instabiles System: Ungedämpfte Schwingung")
+```
+
+```{r}
+# Logistische Gleichung
+logistic_map <- function(r, x0, n) {
+  x <- numeric(n)
+  x[1] <- x0
+  for (i in 2:n) {
+    x[i] <- r * x[i-1] * (1 - x[i-1])  # Logistische Gleichung
+  }
+  return(x)
+}
+
+# Parameter
+r <- 3.8  # Chaotischer Bereich
+x0 <- 0.4  # Anfangswert
+n <- 100  # Iterationen
+
+# Simulation
+trajectory <- logistic_map(r, x0, n)
+
+# Plot
+plot(1:n, trajectory, type = "l", col = "purple", lwd = 2,
+     xlab = "Iteration", ylab = "Populationsdichte x",
+     main = "Chaotisches System: Logistische Gleichung")
+```
+
