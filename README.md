@@ -33,3 +33,10 @@ Code-Collection-from-Bioinformatics-Master/
 
 This project is licensed under the [MIT License](LICENSE).
  
+---
+
+## ✅ Usage
+
+Clone the repository and explore the Python and R folders based on your interest.
+
+Happy coding! 🧪🖥️
